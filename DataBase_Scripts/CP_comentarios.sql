@@ -2083,3 +2083,436 @@ COMMENT ON COLUMN CP_BITACORA_ACCESO.resultado IS
 
 COMMENT ON COLUMN CP_BITACORA_ACCESO.direccion_ip IS
 'Dirección IP desde la cual se realizó el acceso.';
+
+-- ============================================================
+-- ENTREGA 2: COMENTARIOS DE LAS 17 TABLAS NUEVAS
+-- ============================================================
+
+-- ============================================================
+-- 101. CP_BITACORA_CLIENTE
+-- ============================================================
+
+COMMENT ON TABLE CP_BITACORA_CLIENTE IS
+'Conserva el historial de cambios realizados sobre los clientes.';
+
+COMMENT ON COLUMN CP_BITACORA_CLIENTE.id_bitacora_cliente IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_BITACORA_CLIENTE.id_cliente IS
+'Referencia al registro de cliente.';
+
+COMMENT ON COLUMN CP_BITACORA_CLIENTE.id_usuario IS
+'Referencia al registro de usuario.';
+
+COMMENT ON COLUMN CP_BITACORA_CLIENTE.operacion IS
+'Tipo de operación auditada, por ejemplo inserción, actualización o eliminación.';
+
+COMMENT ON COLUMN CP_BITACORA_CLIENTE.valor_anterior IS
+'Datos del registro antes de la modificación.';
+
+COMMENT ON COLUMN CP_BITACORA_CLIENTE.valor_nuevo IS
+'Datos del registro después de la modificación.';
+
+COMMENT ON COLUMN CP_BITACORA_CLIENTE.fecha_hora IS
+'Fecha y hora en que se registró el evento.';
+
+-- ============================================================
+-- 102. CP_BITACORA_COSTO_PRODUCTO
+-- ============================================================
+
+COMMENT ON TABLE CP_BITACORA_COSTO_PRODUCTO IS
+'Registra los cambios en el costo de compra de productos por proveedor.';
+
+COMMENT ON COLUMN CP_BITACORA_COSTO_PRODUCTO.id_bitacora_costo_producto IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_BITACORA_COSTO_PRODUCTO.id_producto_proveedor IS
+'Referencia al registro de producto proveedor.';
+
+COMMENT ON COLUMN CP_BITACORA_COSTO_PRODUCTO.id_usuario IS
+'Referencia al registro de usuario.';
+
+COMMENT ON COLUMN CP_BITACORA_COSTO_PRODUCTO.costo_anterior IS
+'Costo registrado antes del cambio.';
+
+COMMENT ON COLUMN CP_BITACORA_COSTO_PRODUCTO.costo_nuevo IS
+'Costo registrado después del cambio.';
+
+COMMENT ON COLUMN CP_BITACORA_COSTO_PRODUCTO.fecha_hora IS
+'Fecha y hora en que se registró el evento.';
+
+-- ============================================================
+-- 103. CP_BITACORA_DESCUENTO
+-- ============================================================
+
+COMMENT ON TABLE CP_BITACORA_DESCUENTO IS
+'Registra las operaciones y modificaciones efectuadas sobre descuentos.';
+
+COMMENT ON COLUMN CP_BITACORA_DESCUENTO.id_bitacora_descuento IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_BITACORA_DESCUENTO.id_descuento IS
+'Referencia al registro de descuento.';
+
+COMMENT ON COLUMN CP_BITACORA_DESCUENTO.id_usuario IS
+'Referencia al registro de usuario.';
+
+COMMENT ON COLUMN CP_BITACORA_DESCUENTO.operacion IS
+'Tipo de operación auditada, por ejemplo inserción, actualización o eliminación.';
+
+COMMENT ON COLUMN CP_BITACORA_DESCUENTO.valor_anterior IS
+'Datos del registro antes de la modificación.';
+
+COMMENT ON COLUMN CP_BITACORA_DESCUENTO.valor_nuevo IS
+'Datos del registro después de la modificación.';
+
+COMMENT ON COLUMN CP_BITACORA_DESCUENTO.fecha_hora IS
+'Fecha y hora en que se registró el evento.';
+
+-- ============================================================
+-- 104. CP_BITACORA_ERROR
+-- ============================================================
+
+COMMENT ON TABLE CP_BITACORA_ERROR IS
+'Almacena errores detectados durante la ejecución de procesos del sistema.';
+
+COMMENT ON COLUMN CP_BITACORA_ERROR.id_bitacora_error IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_BITACORA_ERROR.modulo IS
+'Módulo o proceso en el que se produjo el error.';
+
+COMMENT ON COLUMN CP_BITACORA_ERROR.codigo_error IS
+'Código de error devuelto por el proceso.';
+
+COMMENT ON COLUMN CP_BITACORA_ERROR.mensaje_error IS
+'Mensaje descriptivo del error.';
+
+COMMENT ON COLUMN CP_BITACORA_ERROR.detalle_error IS
+'Información adicional para diagnosticar el error.';
+
+COMMENT ON COLUMN CP_BITACORA_ERROR.fecha_hora IS
+'Fecha y hora en que se registró el evento.';
+
+-- ============================================================
+-- 105. CP_BITACORA_PROMOCION
+-- ============================================================
+
+COMMENT ON TABLE CP_BITACORA_PROMOCION IS
+'Registra las operaciones y modificaciones efectuadas sobre promociones.';
+
+COMMENT ON COLUMN CP_BITACORA_PROMOCION.id_bitacora_promocion IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_BITACORA_PROMOCION.id_promocion IS
+'Referencia al registro de promocion.';
+
+COMMENT ON COLUMN CP_BITACORA_PROMOCION.id_usuario IS
+'Referencia al registro de usuario.';
+
+COMMENT ON COLUMN CP_BITACORA_PROMOCION.operacion IS
+'Tipo de operación auditada, por ejemplo inserción, actualización o eliminación.';
+
+COMMENT ON COLUMN CP_BITACORA_PROMOCION.valor_anterior IS
+'Datos del registro antes de la modificación.';
+
+COMMENT ON COLUMN CP_BITACORA_PROMOCION.valor_nuevo IS
+'Datos del registro después de la modificación.';
+
+COMMENT ON COLUMN CP_BITACORA_PROMOCION.fecha_hora IS
+'Fecha y hora en que se registró el evento.';
+
+-- ============================================================
+-- 106. CP_BITACORA_PROVEEDOR
+-- ============================================================
+
+COMMENT ON TABLE CP_BITACORA_PROVEEDOR IS
+'Conserva el historial de cambios realizados sobre proveedores.';
+
+COMMENT ON COLUMN CP_BITACORA_PROVEEDOR.id_bitacora_proveedor IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_BITACORA_PROVEEDOR.id_proveedor IS
+'Referencia al registro de proveedor.';
+
+COMMENT ON COLUMN CP_BITACORA_PROVEEDOR.id_usuario IS
+'Referencia al registro de usuario.';
+
+COMMENT ON COLUMN CP_BITACORA_PROVEEDOR.operacion IS
+'Tipo de operación auditada, por ejemplo inserción, actualización o eliminación.';
+
+COMMENT ON COLUMN CP_BITACORA_PROVEEDOR.valor_anterior IS
+'Datos del registro antes de la modificación.';
+
+COMMENT ON COLUMN CP_BITACORA_PROVEEDOR.valor_nuevo IS
+'Datos del registro después de la modificación.';
+
+COMMENT ON COLUMN CP_BITACORA_PROVEEDOR.fecha_hora IS
+'Fecha y hora en que se registró el evento.';
+
+-- ============================================================
+-- 107. CP_CIERRE_DIARIO
+-- ============================================================
+
+COMMENT ON TABLE CP_CIERRE_DIARIO IS
+'Resume los importes de ventas y devoluciones por sucursal y fecha de cierre.';
+
+COMMENT ON COLUMN CP_CIERRE_DIARIO.id_cierre_diario IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_CIERRE_DIARIO.id_sucursal IS
+'Referencia al registro de sucursal.';
+
+COMMENT ON COLUMN CP_CIERRE_DIARIO.fecha_cierre IS
+'Fecha comercial correspondiente al cierre diario.';
+
+COMMENT ON COLUMN CP_CIERRE_DIARIO.fecha_ejecucion IS
+'Fecha y hora de ejecución del proceso.';
+
+COMMENT ON COLUMN CP_CIERRE_DIARIO.total_ventas IS
+'Importe acumulado de ventas.';
+
+COMMENT ON COLUMN CP_CIERRE_DIARIO.total_devoluciones IS
+'Importe acumulado de devoluciones.';
+
+-- ============================================================
+-- 108. CP_DETALLE_CIERRE_DIARIO
+-- ============================================================
+
+COMMENT ON TABLE CP_DETALLE_CIERRE_DIARIO IS
+'Desglosa por usuario los movimientos incluidos en cada cierre diario.';
+
+COMMENT ON COLUMN CP_DETALLE_CIERRE_DIARIO.id_detalle_cierre_diario IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_DETALLE_CIERRE_DIARIO.id_cierre_diario IS
+'Referencia al registro de cierre diario.';
+
+COMMENT ON COLUMN CP_DETALLE_CIERRE_DIARIO.id_usuario IS
+'Referencia al registro de usuario.';
+
+COMMENT ON COLUMN CP_DETALLE_CIERRE_DIARIO.cantidad_ventas IS
+'Número de ventas incluidas en el detalle.';
+
+COMMENT ON COLUMN CP_DETALLE_CIERRE_DIARIO.cantidad_devoluciones IS
+'Número de devoluciones incluidas en el detalle.';
+
+COMMENT ON COLUMN CP_DETALLE_CIERRE_DIARIO.total_ventas IS
+'Importe acumulado de ventas.';
+
+COMMENT ON COLUMN CP_DETALLE_CIERRE_DIARIO.total_devoluciones IS
+'Importe acumulado de devoluciones.';
+
+-- ============================================================
+-- 109. CP_DESCUENTO_PRODUCTO
+-- ============================================================
+
+COMMENT ON TABLE CP_DESCUENTO_PRODUCTO IS
+'Asocia descuentos con productos y define su período de aplicación.';
+
+COMMENT ON COLUMN CP_DESCUENTO_PRODUCTO.id_descuento_producto IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_DESCUENTO_PRODUCTO.id_descuento IS
+'Referencia al registro de descuento.';
+
+COMMENT ON COLUMN CP_DESCUENTO_PRODUCTO.id_producto IS
+'Referencia al registro de producto.';
+
+COMMENT ON COLUMN CP_DESCUENTO_PRODUCTO.fecha_inicio IS
+'Fecha inicial de vigencia.';
+
+COMMENT ON COLUMN CP_DESCUENTO_PRODUCTO.fecha_fin IS
+'Fecha final de vigencia.';
+
+COMMENT ON COLUMN CP_DESCUENTO_PRODUCTO.activo IS
+'Indica con S o N si el registro está activo.';
+
+-- ============================================================
+-- 110. CP_TIPO_PROMOCION
+-- ============================================================
+
+COMMENT ON TABLE CP_TIPO_PROMOCION IS
+'Catálogo de tipos de promoción disponibles en el sistema.';
+
+COMMENT ON COLUMN CP_TIPO_PROMOCION.id_tipo_promocion IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_TIPO_PROMOCION.nombre_tipo_promocion IS
+'Nombre del tipo de promoción.';
+
+COMMENT ON COLUMN CP_TIPO_PROMOCION.descripcion IS
+'Descripción del tipo de promoción.';
+
+-- ============================================================
+-- 111. CP_CONFIGURACION_CORREO
+-- ============================================================
+
+COMMENT ON TABLE CP_CONFIGURACION_CORREO IS
+'Configura los datos de conexión SMTP y la cuenta remitente de notificaciones.';
+
+COMMENT ON COLUMN CP_CONFIGURACION_CORREO.id_configuracion_correo IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_CONFIGURACION_CORREO.id_contacto_remitente IS
+'Referencia al registro de contacto remitente.';
+
+COMMENT ON COLUMN CP_CONFIGURACION_CORREO.servidor_smtp IS
+'Nombre o dirección del servidor SMTP.';
+
+COMMENT ON COLUMN CP_CONFIGURACION_CORREO.puerto_smtp IS
+'Puerto utilizado para la conexión SMTP.';
+
+COMMENT ON COLUMN CP_CONFIGURACION_CORREO.usuario_smtp IS
+'Nombre de usuario para autenticación SMTP.';
+
+COMMENT ON COLUMN CP_CONFIGURACION_CORREO.clave_cifrada IS
+'Contraseña SMTP almacenada en formato cifrado.';
+
+COMMENT ON COLUMN CP_CONFIGURACION_CORREO.requiere_tls IS
+'Indica con S o N si se requiere conexión TLS.';
+
+COMMENT ON COLUMN CP_CONFIGURACION_CORREO.activo IS
+'Indica con S o N si el registro está activo.';
+
+-- ============================================================
+-- 112. CP_DESTINATARIO_NOTIFICACION
+-- ============================================================
+
+COMMENT ON TABLE CP_DESTINATARIO_NOTIFICACION IS
+'Identifica los contactos habilitados para recibir notificaciones.';
+
+COMMENT ON COLUMN CP_DESTINATARIO_NOTIFICACION.id_destinatario IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_DESTINATARIO_NOTIFICACION.id_contacto IS
+'Referencia al registro de contacto.';
+
+COMMENT ON COLUMN CP_DESTINATARIO_NOTIFICACION.activo IS
+'Indica con S o N si el registro está activo.';
+
+-- ============================================================
+-- 113. CP_NOTIFICACION
+-- ============================================================
+
+COMMENT ON TABLE CP_NOTIFICACION IS
+'Almacena los mensajes de notificación preparados para su envío.';
+
+COMMENT ON COLUMN CP_NOTIFICACION.id_notificacion IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_NOTIFICACION.id_configuracion_correo IS
+'Referencia al registro de configuracion correo.';
+
+COMMENT ON COLUMN CP_NOTIFICACION.asunto IS
+'Asunto del mensaje de notificación.';
+
+COMMENT ON COLUMN CP_NOTIFICACION.mensaje IS
+'Contenido del mensaje de notificación.';
+
+COMMENT ON COLUMN CP_NOTIFICACION.tipo_notificacion IS
+'Categoría o finalidad de la notificación.';
+
+COMMENT ON COLUMN CP_NOTIFICACION.fecha_creacion IS
+'Fecha y hora de creación del registro.';
+
+-- ============================================================
+-- 114. CP_NOTIFICACION_DESTINATARIO
+-- ============================================================
+
+COMMENT ON TABLE CP_NOTIFICACION_DESTINATARIO IS
+'Registra los destinatarios de cada notificación y el resultado de su envío.';
+
+COMMENT ON COLUMN CP_NOTIFICACION_DESTINATARIO.id_notificacion_destinatario IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_NOTIFICACION_DESTINATARIO.id_notificacion IS
+'Referencia al registro de notificacion.';
+
+COMMENT ON COLUMN CP_NOTIFICACION_DESTINATARIO.id_destinatario IS
+'Referencia al registro de destinatario.';
+
+COMMENT ON COLUMN CP_NOTIFICACION_DESTINATARIO.estado_envio IS
+'Estado del envío al destinatario.';
+
+COMMENT ON COLUMN CP_NOTIFICACION_DESTINATARIO.fecha_envio IS
+'Fecha y hora del intento o realización del envío.';
+
+COMMENT ON COLUMN CP_NOTIFICACION_DESTINATARIO.detalle_error IS
+'Información adicional para diagnosticar el error.';
+
+-- ============================================================
+-- 115. CP_EJECUCION_PREMIACION
+-- ============================================================
+
+COMMENT ON TABLE CP_EJECUCION_PREMIACION IS
+'Registra las ejecuciones del proceso de premiación y el período evaluado.';
+
+COMMENT ON COLUMN CP_EJECUCION_PREMIACION.id_ejecucion_premiacion IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_EJECUCION_PREMIACION.fecha_ejecucion IS
+'Fecha y hora de ejecución del proceso.';
+
+COMMENT ON COLUMN CP_EJECUCION_PREMIACION.fecha_inicio_periodo IS
+'Fecha inicial del período evaluado para premiación.';
+
+COMMENT ON COLUMN CP_EJECUCION_PREMIACION.fecha_fin_periodo IS
+'Fecha final del período evaluado para premiación.';
+
+COMMENT ON COLUMN CP_EJECUCION_PREMIACION.monto_premio IS
+'Importe monetario asignado como premio.';
+
+COMMENT ON COLUMN CP_EJECUCION_PREMIACION.cantidad_premiados IS
+'Número de clientes premiados en la ejecución.';
+
+-- ============================================================
+-- 116. CP_ORDEN_PREMIO_CLIENTE
+-- ============================================================
+
+COMMENT ON TABLE CP_ORDEN_PREMIO_CLIENTE IS
+'Almacena los premios asignados a clientes en una ejecución de premiación.';
+
+COMMENT ON COLUMN CP_ORDEN_PREMIO_CLIENTE.id_orden_premio_cliente IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_ORDEN_PREMIO_CLIENTE.id_ejecucion_premiacion IS
+'Referencia al registro de ejecucion premiacion.';
+
+COMMENT ON COLUMN CP_ORDEN_PREMIO_CLIENTE.id_cliente IS
+'Referencia al registro de cliente.';
+
+COMMENT ON COLUMN CP_ORDEN_PREMIO_CLIENTE.posicion IS
+'Posición del cliente en la premiación.';
+
+COMMENT ON COLUMN CP_ORDEN_PREMIO_CLIENTE.monto_premio IS
+'Importe monetario asignado como premio.';
+
+COMMENT ON COLUMN CP_ORDEN_PREMIO_CLIENTE.fecha_emision IS
+'Fecha y hora de emisión de la orden de premio.';
+
+-- ============================================================
+-- 117. CP_PADRON_NACIONAL
+-- ============================================================
+
+COMMENT ON TABLE CP_PADRON_NACIONAL IS
+'Almacena datos básicos del padrón nacional para validación de identidad por cédula.';
+
+COMMENT ON COLUMN CP_PADRON_NACIONAL.id_padron IS
+'Identificador único del registro.';
+
+COMMENT ON COLUMN CP_PADRON_NACIONAL.cedula IS
+'Número de cédula de la persona en el padrón nacional.';
+
+COMMENT ON COLUMN CP_PADRON_NACIONAL.nombre IS
+'Nombre de la persona en el padrón nacional.';
+
+COMMENT ON COLUMN CP_PADRON_NACIONAL.primer_apellido IS
+'Primer apellido de la persona.';
+
+COMMENT ON COLUMN CP_PADRON_NACIONAL.segundo_apellido IS
+'Segundo apellido de la persona.';
+
+COMMENT ON COLUMN CP_PADRON_NACIONAL.codigo_electoral IS
+'Código electoral registrado en el padrón nacional.';
+

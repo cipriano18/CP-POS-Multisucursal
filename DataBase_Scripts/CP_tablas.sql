@@ -3286,3 +3286,474 @@ CREATE TABLE CP_BITACORA_ACCESO (
         CHECK (tipo_acceso IN ('INICIO_SESION', 'CIERRE_SESION'))
 
 ) TABLESPACE CP_POS_AUDITORIA;
+
+
+-- ============================================================
+-- TABLAS NUEVAS - ENTREGABLE 2
+-- ============================================================
+
+
+-- ============================================================
+-- 101. CP_BITACORA_CLIENTE
+-- ============================================================
+
+CREATE TABLE CP_BITACORA_CLIENTE (
+
+    id_bitacora_cliente NUMBER
+        DEFAULT SEQ_CP_BITACORA_CLIENTE.NEXTVAL
+        NOT NULL,
+
+    id_cliente NUMBER,
+
+    id_usuario NUMBER,
+
+    operacion VARCHAR2(20) NOT NULL,
+
+    valor_anterior CLOB,
+
+    valor_nuevo CLOB,
+
+    fecha_hora TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    CONSTRAINT PK_CP_BITACORA_CLIENTE
+        PRIMARY KEY (id_bitacora_cliente)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_AUDITORIA;
+
+
+-- ============================================================
+-- 102. CP_BITACORA_COSTO_PRODUCTO
+-- ============================================================
+
+CREATE TABLE CP_BITACORA_COSTO_PRODUCTO (
+
+    id_bitacora_costo_producto NUMBER
+        DEFAULT SEQ_CP_BITACORA_COSTO_PRODUCTO.NEXTVAL
+        NOT NULL,
+
+    id_producto_proveedor NUMBER NOT NULL,
+
+    id_usuario NUMBER,
+
+    costo_anterior NUMBER(14,2) NOT NULL,
+
+    costo_nuevo NUMBER(14,2) NOT NULL,
+
+    fecha_hora TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    CONSTRAINT PK_CP_BITACORA_COSTO_PRODUCTO
+        PRIMARY KEY (id_bitacora_costo_producto)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_AUDITORIA;
+
+
+-- ============================================================
+-- 103. CP_BITACORA_DESCUENTO
+-- ============================================================
+
+CREATE TABLE CP_BITACORA_DESCUENTO (
+
+    id_bitacora_descuento NUMBER
+        DEFAULT SEQ_CP_BITACORA_DESCUENTO.NEXTVAL
+        NOT NULL,
+
+    id_descuento NUMBER,
+
+    id_usuario NUMBER,
+
+    operacion VARCHAR2(20) NOT NULL,
+
+    valor_anterior CLOB,
+
+    valor_nuevo CLOB,
+
+    fecha_hora TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    CONSTRAINT PK_CP_BITACORA_DESCUENTO
+        PRIMARY KEY (id_bitacora_descuento)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_AUDITORIA;
+
+
+-- ============================================================
+-- 104. CP_BITACORA_ERROR
+-- ============================================================
+
+CREATE TABLE CP_BITACORA_ERROR (
+
+    id_bitacora_error NUMBER
+        DEFAULT SEQ_CP_BITACORA_ERROR.NEXTVAL
+        NOT NULL,
+
+    modulo VARCHAR2(100),
+
+    codigo_error NUMBER,
+
+    mensaje_error VARCHAR2(4000) NOT NULL,
+
+    detalle_error CLOB,
+
+    fecha_hora TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    CONSTRAINT PK_CP_BITACORA_ERROR
+        PRIMARY KEY (id_bitacora_error)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_AUDITORIA;
+
+
+-- ============================================================
+-- 105. CP_BITACORA_PROMOCION
+-- ============================================================
+
+CREATE TABLE CP_BITACORA_PROMOCION (
+
+    id_bitacora_promocion NUMBER
+        DEFAULT SEQ_CP_BITACORA_PROMOCION.NEXTVAL
+        NOT NULL,
+
+    id_promocion NUMBER,
+
+    id_usuario NUMBER,
+
+    operacion VARCHAR2(20) NOT NULL,
+
+    valor_anterior CLOB,
+
+    valor_nuevo CLOB,
+
+    fecha_hora TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    CONSTRAINT PK_CP_BITACORA_PROMOCION
+        PRIMARY KEY (id_bitacora_promocion)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_AUDITORIA;
+
+
+-- ============================================================
+-- 106. CP_BITACORA_PROVEEDOR
+-- ============================================================
+
+CREATE TABLE CP_BITACORA_PROVEEDOR (
+
+    id_bitacora_proveedor NUMBER
+        DEFAULT SEQ_CP_BITACORA_PROVEEDOR.NEXTVAL
+        NOT NULL,
+
+    id_proveedor NUMBER,
+
+    id_usuario NUMBER,
+
+    operacion VARCHAR2(20) NOT NULL,
+
+    valor_anterior CLOB,
+
+    valor_nuevo CLOB,
+
+    fecha_hora TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    CONSTRAINT PK_CP_BITACORA_PROVEEDOR
+        PRIMARY KEY (id_bitacora_proveedor)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_AUDITORIA;
+
+
+-- ============================================================
+-- 107. CP_CIERRE_DIARIO
+-- ============================================================
+
+CREATE TABLE CP_CIERRE_DIARIO (
+
+    id_cierre_diario NUMBER
+        DEFAULT SEQ_CP_CIERRE_DIARIO.NEXTVAL
+        NOT NULL,
+
+    id_sucursal NUMBER NOT NULL,
+
+    fecha_cierre DATE NOT NULL,
+
+    fecha_ejecucion TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    total_ventas NUMBER(14,2) DEFAULT 0 NOT NULL,
+
+    total_devoluciones NUMBER(14,2) DEFAULT 0 NOT NULL,
+
+    CONSTRAINT PK_CP_CIERRE_DIARIO
+        PRIMARY KEY (id_cierre_diario)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 108. CP_DETALLE_CIERRE_DIARIO
+-- ============================================================
+
+CREATE TABLE CP_DETALLE_CIERRE_DIARIO (
+
+    id_detalle_cierre_diario NUMBER
+        DEFAULT SEQ_CP_DETALLE_CIERRE_DIARIO.NEXTVAL
+        NOT NULL,
+
+    id_cierre_diario NUMBER NOT NULL,
+
+    id_usuario NUMBER NOT NULL,
+
+    cantidad_ventas NUMBER DEFAULT 0 NOT NULL,
+
+    cantidad_devoluciones NUMBER DEFAULT 0 NOT NULL,
+
+    total_ventas NUMBER(14,2) DEFAULT 0 NOT NULL,
+
+    total_devoluciones NUMBER(14,2) DEFAULT 0 NOT NULL,
+
+    CONSTRAINT PK_CP_DETALLE_CIERRE_DIARIO
+        PRIMARY KEY (id_detalle_cierre_diario)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 109. CP_DESCUENTO_PRODUCTO
+-- ============================================================
+
+CREATE TABLE CP_DESCUENTO_PRODUCTO (
+
+    id_descuento_producto NUMBER
+        DEFAULT SEQ_CP_DESCUENTO_PRODUCTO.NEXTVAL
+        NOT NULL,
+
+    id_descuento NUMBER NOT NULL,
+
+    id_producto NUMBER NOT NULL,
+
+    fecha_inicio DATE,
+
+    fecha_fin DATE,
+
+    activo CHAR(1) DEFAULT 'S' NOT NULL,
+
+    CONSTRAINT PK_CP_DESCUENTO_PRODUCTO
+        PRIMARY KEY (id_descuento_producto)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 110. CP_TIPO_PROMOCION
+-- ============================================================
+
+CREATE TABLE CP_TIPO_PROMOCION (
+
+    id_tipo_promocion NUMBER
+        DEFAULT SEQ_CP_TIPO_PROMOCION.NEXTVAL
+        NOT NULL,
+
+    nombre_tipo_promocion VARCHAR2(50) NOT NULL,
+
+    descripcion VARCHAR2(200),
+
+    CONSTRAINT PK_CP_TIPO_PROMOCION
+        PRIMARY KEY (id_tipo_promocion)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 111. CP_CONFIGURACION_CORREO
+-- ============================================================
+
+CREATE TABLE CP_CONFIGURACION_CORREO (
+
+    id_configuracion_correo NUMBER
+        DEFAULT SEQ_CP_CONFIGURACION_CORREO.NEXTVAL
+        NOT NULL,
+
+    id_contacto_remitente NUMBER NOT NULL,
+
+    servidor_smtp VARCHAR2(150) NOT NULL,
+
+    puerto_smtp NUMBER NOT NULL,
+
+    usuario_smtp VARCHAR2(150) NOT NULL,
+
+    clave_cifrada RAW(2000) NOT NULL,
+
+    requiere_tls CHAR(1) DEFAULT 'S' NOT NULL,
+
+    activo CHAR(1) DEFAULT 'S' NOT NULL,
+
+    CONSTRAINT PK_CP_CONFIGURACION_CORREO
+        PRIMARY KEY (id_configuracion_correo)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 112. CP_DESTINATARIO_NOTIFICACION
+-- ============================================================
+
+CREATE TABLE CP_DESTINATARIO_NOTIFICACION (
+
+    id_destinatario NUMBER
+        DEFAULT SEQ_CP_DESTINATARIO_NOTIFICACION.NEXTVAL
+        NOT NULL,
+
+    id_contacto NUMBER NOT NULL,
+
+    activo CHAR(1) DEFAULT 'S' NOT NULL,
+
+    CONSTRAINT PK_CP_DESTINATARIO_NOTIFICACION
+        PRIMARY KEY (id_destinatario)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 113. CP_NOTIFICACION
+-- ============================================================
+
+CREATE TABLE CP_NOTIFICACION (
+
+    id_notificacion NUMBER
+        DEFAULT SEQ_CP_NOTIFICACION.NEXTVAL
+        NOT NULL,
+
+    id_configuracion_correo NUMBER NOT NULL,
+
+    asunto VARCHAR2(200) NOT NULL,
+
+    mensaje CLOB NOT NULL,
+
+    tipo_notificacion VARCHAR2(50),
+
+    fecha_creacion TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    CONSTRAINT PK_CP_NOTIFICACION
+        PRIMARY KEY (id_notificacion)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 114. CP_NOTIFICACION_DESTINATARIO
+-- ============================================================
+
+CREATE TABLE CP_NOTIFICACION_DESTINATARIO (
+
+    id_notificacion_destinatario NUMBER
+        DEFAULT SEQ_CP_NOTIFICACION_DESTINATARIO.NEXTVAL
+        NOT NULL,
+
+    id_notificacion NUMBER NOT NULL,
+
+    id_destinatario NUMBER NOT NULL,
+
+    estado_envio VARCHAR2(20) DEFAULT 'PENDIENTE' NOT NULL,
+
+    fecha_envio TIMESTAMP,
+
+    detalle_error VARCHAR2(1000),
+
+    CONSTRAINT PK_CP_NOTIFICACION_DESTINATARIO
+        PRIMARY KEY (id_notificacion_destinatario)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 115. CP_EJECUCION_PREMIACION
+-- ============================================================
+
+CREATE TABLE CP_EJECUCION_PREMIACION (
+
+    id_ejecucion_premiacion NUMBER
+        DEFAULT SEQ_CP_EJECUCION_PREMIACION.NEXTVAL
+        NOT NULL,
+
+    fecha_ejecucion TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    fecha_inicio_periodo DATE NOT NULL,
+
+    fecha_fin_periodo DATE NOT NULL,
+
+    monto_premio NUMBER(14,2) NOT NULL,
+
+    cantidad_premiados NUMBER DEFAULT 0 NOT NULL,
+
+    CONSTRAINT PK_CP_EJECUCION_PREMIACION
+        PRIMARY KEY (id_ejecucion_premiacion)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 116. CP_ORDEN_PREMIO_CLIENTE
+-- ============================================================
+
+CREATE TABLE CP_ORDEN_PREMIO_CLIENTE (
+
+    id_orden_premio_cliente NUMBER
+        DEFAULT SEQ_CP_ORDEN_PREMIO_CLIENTE.NEXTVAL
+        NOT NULL,
+
+    id_ejecucion_premiacion NUMBER NOT NULL,
+
+    id_cliente NUMBER NOT NULL,
+
+    posicion NUMBER NOT NULL,
+
+    monto_premio NUMBER(14,2) NOT NULL,
+
+    fecha_emision TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
+
+    CONSTRAINT PK_CP_ORDEN_PREMIO_CLIENTE
+        PRIMARY KEY (id_orden_premio_cliente)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+
+
+-- ============================================================
+-- 117. CP_PADRON_NACIONAL
+-- ============================================================
+
+CREATE TABLE CP_PADRON_NACIONAL (
+
+    id_padron NUMBER
+        DEFAULT SEQ_CP_PADRON_NACIONAL.NEXTVAL
+        NOT NULL,
+
+    cedula VARCHAR2(9) NOT NULL,
+
+    nombre VARCHAR2(150) NOT NULL,
+
+    primer_apellido VARCHAR2(50) NOT NULL,
+
+    segundo_apellido VARCHAR2(50),
+
+    codigo_electoral VARCHAR2(6),
+
+    CONSTRAINT PK_CP_PADRON_NACIONAL
+        PRIMARY KEY (id_padron)
+        USING INDEX TABLESPACE CP_POS_INDICES,
+
+    CONSTRAINT UK_CP_PADRON_NACIONAL_CEDULA
+        UNIQUE (cedula)
+        USING INDEX TABLESPACE CP_POS_INDICES
+
+) TABLESPACE CP_POS_DATOS;
+

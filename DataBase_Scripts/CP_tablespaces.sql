@@ -12,11 +12,10 @@
 
 CREATE TABLESPACE CP_POS_DATOS
 DATAFILE 'cp_pos_datos01.dbf'
-SIZE 100M
+SIZE 500M
 AUTOEXTEND ON
-NEXT 10M
+NEXT 100M
 MAXSIZE UNLIMITED;
-
 
 -- ============================================================
 -- 2. TABLESPACE PARA LOS INDICES
