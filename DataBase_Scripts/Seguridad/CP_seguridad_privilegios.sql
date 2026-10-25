@@ -232,6 +232,19 @@ BEGIN
     apply_access('ROL_CP_GERENTE', 'PADRON',             'L');
     apply_access('ROL_CP_GERENTE', 'AUDITORIA',          'L');
 
+    -- La API de facturacion (script 25) es un paquete, no una tabla:
+    -- revoke_all le quita el EXECUTE a los roles, asi que se otorga de nuevo.
+    -- Solo lo reciben los roles que registran documentos.
+    FOR r IN (SELECT object_name
+              FROM dba_objects
+              WHERE owner = c_owner
+                AND object_name = 'PKG_CP_FACTURACION'
+                AND object_type = 'PACKAGE') LOOP
+        grant_object('EXECUTE', r.object_name, 'ROL_CP_DIGITADOR');
+        grant_object('EXECUTE', r.object_name, 'ROL_CP_JEFE_DEPARTAMENTO');
+        grant_object('EXECUTE', r.object_name, 'ROL_CP_JEFE_PROVEEDURIA');
+    END LOOP;
+
     FOR i IN 1 .. REGEXP_COUNT(c_modules, '[^ ]+') LOOP
         v_all := v_all || module_objects(REGEXP_SUBSTR(c_modules, '[^ ]+', 1, i)) || ' ';
     END LOOP;
