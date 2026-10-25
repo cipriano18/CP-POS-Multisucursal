@@ -2,7 +2,7 @@
 
 Esta carpeta contiene los scripts de facturación, inventario, costos y transacciones del Entregable #2. Hacen que la facturación del CP-POS sea automática: las cuentas por cobrar y por pagar, el inventario y el historial de costo se actualizan solos, y una API transaccional agrupa cada operación para que se confirme o se deshaga completa.
 
-Los scripts de seguridad (11 a 17) están en `../Seguridad/` y el orden completo de todos los scripts de la Parte 2 (11 a 25) está en `../Parte2_Nuevos/ORDEN_EJECUCION.md`. Los scripts 01 a 10 de la Parte 1 no se modifican.
+Los scripts de seguridad (11 a 17) están en `../Seguridad/` y el orden completo de todos los scripts de la Parte 2 (11 a 25) está en `../ORDEN_EJECUCION.md`. Los scripts 01 a 10 de la Parte 1 no se modifican.
 
 ## Requisitos previos
 
