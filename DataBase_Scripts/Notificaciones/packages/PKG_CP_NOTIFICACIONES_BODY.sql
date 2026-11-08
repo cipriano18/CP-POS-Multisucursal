@@ -1,9 +1,5 @@
-
 CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
 
-    ------------------------------------------------------------------
-    -- ENVIAR CORREO ELECTRONICO
-    ------------------------------------------------------------------
     PROCEDURE enviar_correo(
         p_destinatario IN VARCHAR2,
         p_asunto       IN VARCHAR2,
@@ -53,7 +49,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
         ELSE
             RAISE_APPLICATION_ERROR(
                 -20050,
-                'La configuracion SMTP debe utilizar TLS'
+                'La configuraciï¿½n SMTP debe utilizar TLS.'
             );
         END IF;
 
@@ -75,7 +71,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
             'To: ' || p_destinatario || UTL_TCP.CRLF ||
             'Subject: ' || p_asunto || UTL_TCP.CRLF ||
             'Content-Type: text/plain; charset=UTF-8' ||
-            UTL_TCP.CRLF || UTL_TCP.CRLF ||
+            UTL_TCP.CRLF ||
+            UTL_TCP.CRLF ||
             p_mensaje
         );
 
@@ -94,8 +91,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
                 BEGIN
                     UTL_SMTP.QUIT(v_conexion);
                 EXCEPTION
-                    WHEN OTHERS THEN
-                        NULL;
+                    WHEN OTHERS THEN NULL;
                 END;
             END IF;
 
@@ -103,18 +99,14 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
     END enviar_correo;
 
 
-    ------------------------------------------------------------------
-    -- PROCESAR NOTIFICACIONES PENDIENTES
-    ------------------------------------------------------------------
     PROCEDURE procesar_pendientes
     AS
-        v_enviados       NUMBER := 0;
-        v_errores        NUMBER := 0;
-        v_error          VARCHAR2(1000);
+        v_enviados NUMBER := 0;
+        v_errores  NUMBER := 0;
+        v_error    VARCHAR2(1000);
 
-        v_lock_result    NUMBER;
+        v_lock_result NUMBER;
         v_release_result NUMBER;
-
         v_lock_id CONSTANT INTEGER := 108240321;
         v_lock_obtenido BOOLEAN := FALSE;
 
@@ -131,14 +123,15 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
                 IF v_release_result <> 0 THEN
                     RAISE_APPLICATION_ERROR(
                         -20056,
-                        'No se pudo liberar el bloqueo de notificaciones'
+                        'No se pudo liberar el bloqueo de notificaciones.'
                     );
                 END IF;
             END IF;
         END liberar_bloqueo;
 
     BEGIN
-        -- Evita ejecuciones simultaneas del procesador.
+        -- Bloqueo exclusivo de la ejecuciï¿½n.
+        -- No se libera mediante COMMIT ni ROLLBACK.
         v_lock_result := DBMS_LOCK.REQUEST(
             id                => v_lock_id,
             lockmode          => DBMS_LOCK.X_MODE,
@@ -148,14 +141,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
 
         IF v_lock_result = 1 THEN
             DBMS_OUTPUT.PUT_LINE(
-                'Ya existe otra ejecucion procesando notificaciones.'
+                'Ya existe otra ejecuciï¿½n procesando notificaciones.'
             );
             RETURN;
-
         ELSIF v_lock_result <> 0 THEN
             RAISE_APPLICATION_ERROR(
                 -20055,
-                'No se pudo obtener el bloqueo. Codigo: ' ||
+                'No se pudo obtener el bloqueo. Cï¿½digo: ' ||
                 v_lock_result
             );
         END IF;
@@ -163,26 +155,20 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
         v_lock_obtenido := TRUE;
 
         FOR r IN (
-            SELECT
-                ND.ID_NOTIFICACION_DESTINATARIO,
-                C.VALOR_CONTACTO AS CORREO,
-                N.ASUNTO,
-                N.MENSAJE
-            FROM CP_NOTIFICACION_DESTINATARIO ND
-
-            JOIN CP_NOTIFICACION N
-              ON N.ID_NOTIFICACION = ND.ID_NOTIFICACION
-
-            JOIN CP_DESTINATARIO_NOTIFICACION D
-              ON D.ID_DESTINATARIO = ND.ID_DESTINATARIO
-
-            JOIN CP_CONTACTO C
-              ON C.ID_CONTACTO = D.ID_CONTACTO
-
-            WHERE ND.ESTADO_ENVIO = 'PENDIENTE'
-              AND D.ACTIVO = 'S'
-
-            ORDER BY ND.ID_NOTIFICACION_DESTINATARIO
+            SELECT ND.ID_NOTIFICACION_DESTINATARIO,
+                   C.VALOR_CONTACTO AS CORREO,
+                   N.ASUNTO,
+                   N.MENSAJE
+              FROM CP_NOTIFICACION_DESTINATARIO ND
+              JOIN CP_NOTIFICACION N
+                ON N.ID_NOTIFICACION = ND.ID_NOTIFICACION
+              JOIN CP_DESTINATARIO_NOTIFICACION D
+                ON D.ID_DESTINATARIO = ND.ID_DESTINATARIO
+              JOIN CP_CONTACTO C
+                ON C.ID_CONTACTO = D.ID_CONTACTO
+             WHERE ND.ESTADO_ENVIO = 'PENDIENTE'
+               AND D.ACTIVO = 'S'
+             ORDER BY ND.ID_NOTIFICACION_DESTINATARIO
         )
         LOOP
             BEGIN
@@ -235,19 +221,126 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
 
     EXCEPTION
         WHEN OTHERS THEN
-            ROLLBACK;
-
+            DECLARE
+                v_error_original VARCHAR2(4000) := SQLERRM;
             BEGIN
-                liberar_bloqueo;
-            EXCEPTION
-                WHEN OTHERS THEN
-                    DBMS_OUTPUT.PUT_LINE(
-                        'Error al liberar bloqueo: ' || SQLERRM
-                    );
-            END;
+                ROLLBACK;
 
-            RAISE;
+                BEGIN
+                    liberar_bloqueo;
+                EXCEPTION
+                    WHEN OTHERS THEN
+                        DBMS_OUTPUT.PUT_LINE(
+                            'Error al liberar el bloqueo: ' || SQLERRM
+                        );
+                END;
+
+                DBMS_OUTPUT.PUT_LINE(
+                    'Error al procesar las notificaciones pendientes: ' ||
+                    v_error_original
+                );
+
+                RAISE;
+            END;
     END procesar_pendientes;
 
+
+    PROCEDURE encolar(
+        p_tipo    IN VARCHAR2,
+        p_asunto  IN VARCHAR2,
+        p_mensaje IN VARCHAR2,
+        p_correo  IN VARCHAR2
+    )
+    AS
+        v_id_configuracion NUMBER;
+        v_id_contacto      NUMBER;
+        v_id_destinatario  NUMBER;
+    BEGIN
+        -- Validar los datos recibidos.
+        IF p_correo IS NULL OR TRIM(p_correo) IS NULL THEN
+            RAISE_APPLICATION_ERROR(
+                -20060,
+                'El correo del destinatario es obligatorio.'
+            );
+        END IF;
+
+        IF p_asunto IS NULL OR p_mensaje IS NULL THEN
+            RAISE_APPLICATION_ERROR(
+                -20061,
+                'El asunto y el mensaje son obligatorios.'
+            );
+        END IF;
+
+        -- Obtener la configuraciï¿½n de correo activa.
+        SELECT ID_CONFIGURACION_CORREO
+          INTO v_id_configuracion
+          FROM CP_CONFIGURACION_CORREO
+         WHERE ACTIVO = 'S'
+           AND ROWNUM = 1;
+
+        -- Buscar el contacto correspondiente al correo.
+        SELECT ID_CONTACTO
+          INTO v_id_contacto
+          FROM CP_CONTACTO
+         WHERE LOWER(TRIM(VALOR_CONTACTO)) =
+               LOWER(TRIM(p_correo));
+
+        -- Buscar el destinatario activo asociado al contacto.
+        SELECT ID_DESTINATARIO
+          INTO v_id_destinatario
+          FROM CP_DESTINATARIO_NOTIFICACION
+         WHERE ID_CONTACTO = v_id_contacto
+           AND ACTIVO = 'S';
+
+        -- Insertar la notificaciï¿½n.
+        -- Se omite ID_NOTIFICACION suponiendo que la tabla
+        -- lo genera mediante una columna IDENTITY o un trigger.
+        INSERT INTO CP_NOTIFICACION (
+            ID_CONFIGURACION_CORREO,
+            ASUNTO,
+            MENSAJE,
+            TIPO_NOTIFICACION,
+            FECHA_CREACION
+        ) VALUES (
+            v_id_configuracion,
+            p_asunto,
+            p_mensaje,
+            p_tipo,
+            SYSTIMESTAMP
+        );
+
+        -- Insertar la relaciï¿½n con el destinatario.
+        -- Se omite ID_NOTIFICACION_DESTINATARIO suponiendo
+        -- que la tabla lo genera mediante una columna IDENTITY o un trigger.
+        INSERT INTO CP_NOTIFICACION_DESTINATARIO (
+            ID_NOTIFICACION,
+            ID_DESTINATARIO,
+            ESTADO_ENVIO
+        ) VALUES (
+            (SELECT MAX(ID_NOTIFICACION)
+               FROM CP_NOTIFICACION),
+            v_id_destinatario,
+            'PENDIENTE'
+        );
+
+        DBMS_OUTPUT.PUT_LINE(
+            'Notificacion registrada como PENDIENTE para: ' ||
+            p_correo
+        );
+
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(
+                -20062,
+                'No existe una configuracion activa, un contacto o un destinatario para el correo indicado.'
+            );
+
+        WHEN TOO_MANY_ROWS THEN
+            RAISE_APPLICATION_ERROR(
+                -20063,
+                'Se encontraron varios registros para la configuracion o el destinatario.'
+            );
+    END encolar;
+
 END PKG_CP_NOTIFICACIONES;
-/
+
