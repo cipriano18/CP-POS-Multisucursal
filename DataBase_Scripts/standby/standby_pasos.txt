@@ -1,0 +1,1226 @@
+# CP_POS — Oracle Database 21c Enterprise con Oracle Data Guard
+
+## 1. Descripción del proyecto
+
+Este proyecto implementa la base de datos **CP_POS** sobre Oracle Database 21c Enterprise, utilizando Oracle Data Guard para mantener una base de datos primaria y una base de datos física standby.
+
+La arquitectura utiliza dos contenedores Docker:
+
+- **dg-primaria:** base de datos primaria inicial.
+- **dg-standby:** base de datos física standby.
+
+La configuración permite mantener una copia sincronizada de la información, supervisar la replicación y realizar un failover automático mediante **Data Guard Broker y Fast-Start Failover (FSFO)**.
+
+El contenedor anterior de Oracle XE se conserva detenido como respaldo. No se elimina ni se reutilizan directamente sus archivos físicos de datos.
+
+## 2. Arquitectura utilizada
+
+| Elemento | Configuración |
+|---|---|
+| Motor de base de datos | Oracle Database 21c Enterprise |
+| Imagen Docker | `container-registry.oracle.com/database/enterprise:21.3.0.0` |
+| Base de datos | `ORCLCDB` |
+| PDB | `ORCLPDB1` |
+| Nombre único primaria | `ORCLCDB` |
+| Nombre único standby | `ORCLSTBY` |
+| Contenedor primaria | `dg-primaria` |
+| Contenedor standby | `dg-standby` |
+| Puerto de primaria | `1541` |
+| Puerto de standby | `1542` |
+| Puerto interno Oracle | `1521` |
+| Alias de conexión primaria | `primaria_dg` |
+| Alias de conexión standby | `standby_dg` |
+
+La base de datos primaria utiliza el servicio `ORCLPDB1` para las conexiones de la aplicación CP_POS.
+
+## 3. Requisitos previos
+
+- Docker Desktop instalado y funcionando.
+- Acceso a Oracle Container Registry.
+- Oracle Database 21c Enterprise.
+- Archivos SQL del proyecto CP_POS.
+- SQL Developer o PL/SQL Developer.
+- Windows PowerShell.
+
+## 4. Aceptación de términos y descarga de Oracle 21c Enterprise
+
+### 4.1. Aceptar los términos de Oracle
+
+1. Ingresar a https://container-registry.oracle.com.
+2. Iniciar sesión con la cuenta Oracle.
+3. Buscar la sección **Database**.
+4. Seleccionar **Enterprise**.
+5. Aceptar los términos y condiciones de la imagen.
+
+### 4.2. Generar el Auth Token
+
+Desde el perfil de Oracle se debe generar un **Auth Token**. Este token se utiliza como contraseña al iniciar sesión desde Docker.
+
+### 4.3. Iniciar sesión desde PowerShell
+
+```powershell
+docker login -u "SU_CORREO_ORACLE" container-registry.oracle.com
+```
+
+Cuando Docker solicite la contraseña, introducir el Auth Token generado en Oracle.
+
+### 4.4. Descargar la imagen
+
+```powershell
+docker pull container-registry.oracle.com/database/enterprise:21.3.0.0
+```
+
+## 5. Preparación de los contenedores Docker
+
+### 5.1. Revisar los contenedores existentes
+
+Desde Windows PowerShell:
+
+```powershell
+docker ps
+```
+
+### 5.2. Detener el contenedor anterior de Oracle XE
+
+El contenedor anterior se conserva como respaldo. Únicamente se detiene:
+
+```powershell
+docker stop eif402-oracle21c-oficial
+```
+
+No se eliminan el contenedor ni sus volúmenes.
+
+### 5.3. Validar el archivo Docker Compose
+
+Desde la carpeta donde se encuentra el archivo:
+
+```powershell
+docker compose config --quiet
+```
+
+### 5.4. Levantar los contenedores
+
+```powershell
+docker compose up -d
+```
+
+### 5.5. Revisar los contenedores
+
+```powershell
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+Para revisar los registros de arranque de la primaria:
+
+```powershell
+docker compose logs -f primaria
+```
+
+### 5.6. Entrar a los contenedores
+
+Para acceder a la primaria:
+
+```powershell
+docker exec -it dg-primaria bash
+```
+
+Para acceder al standby:
+
+```powershell
+docker exec -it dg-standby bash
+```
+
+Los comandos de Docker se ejecutan desde PowerShell. Los comandos de Linux y Oracle se ejecutan dentro del contenedor correspondiente.
+
+## 6. Configuración de la base de datos primaria
+
+### 6.1. Entrar a la primaria
+
+Desde PowerShell:
+
+```powershell
+docker exec -it dg-primaria bash
+```
+
+### 6.2. Abrir SQL*Plus
+
+Dentro del contenedor:
+
+```bash
+sqlplus / as sysdba
+```
+
+### 6.3. Verificar la base de datos
+
+```sql
+SELECT db_unique_name, database_role, log_mode
+FROM v$database;
+
+SHOW PDBS;
+```
+
+Verificar los archivos de datos de la PDB:
+
+```sql
+ALTER SESSION SET CONTAINER = ORCLPDB1;
+
+SELECT name
+FROM v$datafile;
+
+ALTER SESSION SET CONTAINER = CDB$ROOT;
+```
+
+### 6.4. Configurar FORCE LOGGING
+
+```sql
+ALTER DATABASE FORCE LOGGING;
+```
+
+### 6.5. Configurar el área de recuperación
+
+Dentro del contenedor:
+
+```bash
+mkdir -p /opt/oracle/oradata/fra
+```
+
+En SQL*Plus:
+
+```sql
+ALTER SYSTEM SET db_recovery_file_dest_size = 10G SCOPE=BOTH;
+
+ALTER SYSTEM SET db_recovery_file_dest = '/opt/oracle/oradata/fra' SCOPE=BOTH;
+```
+
+### 6.6. Configurar la administración de archivos standby
+
+```sql
+ALTER SYSTEM SET standby_file_management = AUTO SCOPE=BOTH;
+```
+
+### 6.7. Configurar los archivos de Data Guard Broker
+
+```sql
+ALTER SYSTEM SET dg_broker_config_file1 =
+'/opt/oracle/oradata/ORCLCDB/dr1ORCLCDB.dat' SCOPE=BOTH;
+
+ALTER SYSTEM SET dg_broker_config_file2 =
+'/opt/oracle/oradata/ORCLCDB/dr2ORCLCDB.dat' SCOPE=BOTH;
+
+ALTER SYSTEM SET dg_broker_start = TRUE SCOPE=BOTH;
+```
+
+### 6.8. Habilitar Flashback Database
+
+```sql
+ALTER DATABASE FLASHBACK ON;
+```
+
+### 6.9. Verificar los redo logs
+
+```sql
+SELECT group#, thread#, bytes/1024/1024 AS mb
+FROM v$log;
+```
+
+### 6.10. Crear Standby Redo Logs
+
+```sql
+ALTER DATABASE ADD STANDBY LOGFILE THREAD 1
+GROUP 11 ('/opt/oracle/oradata/ORCLCDB/srl11.log') SIZE 200M;
+
+ALTER DATABASE ADD STANDBY LOGFILE THREAD 1
+GROUP 12 ('/opt/oracle/oradata/ORCLCDB/srl12.log') SIZE 200M;
+
+ALTER DATABASE ADD STANDBY LOGFILE THREAD 1
+GROUP 13 ('/opt/oracle/oradata/ORCLCDB/srl13.log') SIZE 200M;
+
+ALTER DATABASE ADD STANDBY LOGFILE THREAD 1
+GROUP 14 ('/opt/oracle/oradata/ORCLCDB/srl14.log') SIZE 200M;
+```
+
+### 6.11. Verificar la configuración
+
+```sql
+SELECT force_logging, flashback_on
+FROM v$database;
+
+SELECT group#, bytes/1024/1024 AS mb
+FROM v$standby_log;
+```
+
+## 7. Preparación de la base de datos standby
+
+### 7.1. Entrar al contenedor standby
+
+Desde PowerShell:
+
+```powershell
+docker exec -it dg-standby bash
+```
+
+### 7.2. Crear el archivo de inicialización temporal
+
+Dentro del contenedor:
+
+```bash
+printf "db_name='ORCLCDB'\nenable_pluggable_database=true\n" > /tmp/initORCLCDB.ora
+```
+
+### 7.3. Iniciar SQL*Plus
+
+```bash
+sqlplus / as sysdba
+```
+
+### 7.4. Iniciar la instancia en NOMOUNT
+
+```sql
+STARTUP NOMOUNT PFILE='/tmp/initORCLCDB.ora';
+```
+
+Salir de SQL*Plus:
+
+```sql
+exit
+```
+
+## 8. Duplicación de la base de datos con RMAN
+
+La base standby se crea a partir de la base primaria mediante una duplicación activa.
+
+### 8.1. Conectarse a la primaria
+
+Desde el contenedor standby:
+
+```bash
+sqlplus sys@PRIMARIA_DG as sysdba
+```
+
+### 8.2. Iniciar RMAN
+
+Desde la terminal del contenedor:
+
+```bash
+rman TARGET sys@PRIMARIA_DG AUXILIARY sys@STANDBY_DG
+```
+
+### 8.3. Ejecutar la duplicación
+
+Dentro de RMAN:
+
+```rman
+DUPLICATE TARGET DATABASE
+FOR STANDBY
+FROM ACTIVE DATABASE
+DORECOVER
+SPFILE
+SET db_unique_name='ORCLSTBY'
+SET fal_server='PRIMARIA_DG'
+SET log_archive_dest_2=''
+SET dg_broker_config_file1='/opt/oracle/oradata/ORCLCDB/dr1ORCLSTBY.dat'
+SET dg_broker_config_file2='/opt/oracle/oradata/ORCLCDB/dr2ORCLSTBY.dat'
+SET dg_broker_start='TRUE'
+NOFILENAMECHECK;
+```
+
+Este proceso crea la base física standby utilizando la información de la primaria.
+
+## 9. Configuración de Data Guard Broker con DGMGRL
+
+### 9.1. ¿Qué es DGMGRL?
+
+**DGMGRL** es la herramienta de línea de comandos de Oracle Data Guard Broker. Permite administrar la configuración de Data Guard, agregar bases de datos, habilitar la configuración, validar el standby y administrar Fast-Start Failover.
+
+Los comandos de esta sección se ejecutan dentro de la consola DGMGRL, no directamente en PowerShell ni en SQL Developer.
+
+### 9.2. Entrar al contenedor primario
+
+Desde PowerShell:
+
+```powershell
+docker exec -it dg-primaria bash
+```
+
+### 9.3. Abrir DGMGRL
+
+Dentro del contenedor:
+
+```bash
+dgmgrl
+```
+
+Conectarse a la primaria:
+
+```text
+CONNECT sys@primaria_dg;
+```
+
+### 9.4. Crear la configuración Broker
+
+```text
+CREATE CONFIGURATION cp_pos_dg AS
+PRIMARY DATABASE IS ORCLCDB
+CONNECT IDENTIFIER IS PRIMARIA_DG;
+```
+
+### 9.5. Agregar la base standby
+
+```text
+ADD DATABASE ORCLSTBY AS
+CONNECT IDENTIFIER IS STANDBY_DG
+MAINTAINED AS PHYSICAL;
+```
+
+### 9.6. Configurar los identificadores estáticos
+
+Para la primaria:
+
+```text
+EDIT DATABASE ORCLCDB SET PROPERTY
+StaticConnectIdentifier='(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=dg-primaria)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=ORCLCDB_DGMGRL)(SERVER=DEDICATED)))';
+```
+
+Para el standby:
+
+```text
+EDIT DATABASE ORCLSTBY SET PROPERTY
+StaticConnectIdentifier='(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=dg-standby)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=ORCLSTBY_DGMGRL)(SERVER=DEDICATED)))';
+```
+
+### 9.7. Habilitar la configuración
+
+```text
+ENABLE CONFIGURATION;
+```
+
+### 9.8. Verificar la configuración
+
+```text
+SHOW CONFIGURATION;
+
+SHOW DATABASE ORCLSTBY;
+
+VALIDATE DATABASE ORCLSTBY;
+```
+
+## 10. Configuración de Fast-Start Failover (FSFO)
+
+Fast-Start Failover permite que Data Guard Broker realice un cambio automático de rol cuando detecta que la primaria no está disponible y se cumplen las condiciones configuradas.
+
+### 10.1. Configurar los identificadores del Observer
+
+Dentro de DGMGRL:
+
+```text
+EDIT DATABASE ORCLCDB SET PROPERTY
+ObserverConnectIdentifier='primaria_dg';
+
+EDIT DATABASE ORCLSTBY SET PROPERTY
+ObserverConnectIdentifier='standby_dg';
+```
+
+### 10.2. Configurar los destinos de failover
+
+```text
+EDIT DATABASE ORCLCDB SET PROPERTY
+FastStartFailoverTarget='ORCLSTBY';
+
+EDIT DATABASE ORCLSTBY SET PROPERTY
+FastStartFailoverTarget='ORCLCDB';
+```
+
+### 10.3. Configurar las propiedades de FSFO
+
+```text
+EDIT CONFIGURATION SET PROPERTY
+FastStartFailoverThreshold=30;
+
+EDIT CONFIGURATION SET PROPERTY
+FastStartFailoverAutoReinstate=TRUE;
+
+EDIT CONFIGURATION SET PROPERTY
+FastStartFailoverPmyShutdown=TRUE;
+
+EDIT CONFIGURATION SET PROPERTY
+FastStartFailoverLagLimit=0;
+```
+
+### 10.4. Iniciar el Observer
+
+El Observer se ejecuta dentro del contenedor standby.
+
+Desde otra ventana de Windows PowerShell:
+
+```powershell
+docker exec -it dg-standby bash
+```
+
+Dentro del contenedor:
+
+```bash
+dgmgrl
+```
+
+Conectarse a la primaria:
+
+```text
+CONNECT sys@primaria_dg;
+```
+
+Iniciar el Observer:
+
+```text
+START OBSERVER;
+```
+
+En esta implementación el Observer se mantiene en primer plano dentro del contenedor standby. Si se cierra la sesión o se pierde ese contenedor, también se pierde el proceso Observer. Para una instalación productiva se recomienda ejecutarlo en un equipo independiente.
+
+### 10.5. Habilitar Fast-Start Failover
+
+En la consola DGMGRL:
+
+```text
+ENABLE FAST_START FAILOVER;
+```
+
+### 10.6. Verificar FSFO
+
+```text
+SHOW CONFIGURATION;
+
+SHOW FAST_START FAILOVER;
+
+SHOW OBSERVER;
+
+SHOW DATABASE VERBOSE ORCLCDB;
+
+SHOW DATABASE ORCLSTBY;
+```
+
+La configuración debe mostrar FSFO habilitado y el Observer activo.
+
+## 11. Instalación de la base de datos CP_POS
+
+La base de datos CP_POS se reconstruye utilizando los scripts SQL del proyecto. No se copian los archivos físicos de datos de Oracle XE hacia Oracle Enterprise.
+
+La instalación se realiza sobre la PDB `ORCLPDB1` de la base primaria.
+
+### 11.1. Configurar la conexión en SQL Developer
+
+Crear una conexión con los siguientes datos:
+
+| Campo | Valor |
+|---|---|
+| Usuario | SYS o CP_POS, según el script |
+| Host | `127.0.0.1` |
+| Puerto | `1541` |
+| Servicio | `ORCLPDB1` |
+| Rol | SYSDBA cuando corresponda |
+
+### 11.2. Adaptar el script de tablespaces
+
+Se utiliza el archivo `CP_tablespaces.sql` como base para crear `CP_tablespaces_dg.sql`.
+
+Se deben adaptar las tres rutas de archivos de datos para que correspondan a la nueva PDB:
+
+```text
+/opt/oracle/oradata/ORCLCDB/ORCLPDB1/cp_pos_datos01.dbf
+/opt/oracle/oradata/ORCLCDB/ORCLPDB1/cp_pos_indices01.dbf
+/opt/oracle/oradata/ORCLCDB/ORCLPDB1/cp_pos_auditoria01.dbf
+```
+
+### 11.3. Ejecutar los scripts iniciales como SYS
+
+Ejecutar en este orden:
+
+1. `CP_tablespaces_dg.sql`
+2. `CP_usuario_esquema.sql`
+
+### 11.4. Ejecutar los scripts como CP_POS
+
+Conectarse con el usuario `CP_POS` y ejecutar:
+
+1. `CP_secuencias.sql`
+2. `CP_tablas.sql`
+3. `CP_constraints.sql`
+4. `CP_indices.sql`
+5. `CP_triggers_reglas.sql`
+6. `CP_comentarios.sql`
+7. `CP_datos_prueba.sql`
+8. `CP_vistas.sql`
+9. `CP_pruebas.sql`
+
+**Importante:** `CP_datos_prueba.sql` se ejecuta una sola vez y antes del script 18.
+
+El script `CP_pruebas.sql` se utiliza para verificar la instalación inicial.
+
+### 11.5. Ejecutar los scripts restantes del proyecto
+
+Continuar con los scripts 11 al 25 siguiendo el archivo `ORDEN_EJECUCION.md`:
+
+```text
+11, 12, 13, 14, 15, 16, 17, 18,
+19, 20, 21, 22, 25, 23
+```
+
+El script 24 es opcional.
+
+Se debe respetar el orden definido en el proyecto para evitar dependencias incompletas.
+
+## 12. Scripts de seguridad
+
+| Script | Usuario de ejecución | Función |
+|---|---|---|
+| `CP_seguridad_perfiles.sql` | SYS | Crea los perfiles de usuarios |
+| `CP_seguridad_roles.sql` | SYS | Crea los cinco roles |
+| `CP_seguridad_privilegios.sql` | SYS | Asigna privilegios |
+| `CP_seguridad_cifrado.sql` | CP_POS | Configura el cifrado |
+| `CP_seguridad_paquetes.sql` | CP_POS | Crea los paquetes de seguridad |
+| `CP_seguridad_usuarios.sql` | SYS | Crea los usuarios |
+| `CP_seguridad_pruebas_usuarios.sql` | Cada usuario DG | Ejecuta las pruebas de usuarios |
+
+Resultados documentados:
+
+- Cinco roles creados.
+- 623 privilegios procesados.
+- Cero tablas sin clasificar.
+- Dos tablas y catorce parámetros relacionados con el cifrado.
+- Seis paquetes en estado VALID.
+- Pruebas de los paquetes de seguridad ejecutadas correctamente.
+- Cuatro usuarios creados.
+- Trece pruebas de usuario correctas por usuario.
+
+Las contraseñas de los usuarios se establecen durante la ejecución. No se deben guardar contraseñas en el README.
+
+## 13. Scripts de facturación
+
+Los scripts de facturación se ejecutan sobre el esquema CP_POS.
+
+| Script | Función |
+|---|---|
+| `CP_facturacion_cuentas.sql` | Configura montos y saldos |
+| `CP_facturacion_credito_pagar.sql` | Configura información de créditos de proveedores |
+| `CP_facturacion_paquetes.sql` | Implementa los paquetes de cobro y pago |
+| `CP_facturacion_inventario.sql` | Configura operaciones de inventario |
+| `CP_facturacion_costos.sql` | Configura operaciones de costos |
+| `CP_facturacion_transacciones.sql` | Configura transacciones |
+| `CP_facturacion_pruebas_usuarios.sql` | Ejecuta pruebas con usuarios DG |
+| `CP_facturacion_concurrencia.sql` | Prueba concurrencia entre sesiones; opcional |
+
+Resultados documentados:
+
+- Paquete de cobro: 25 pruebas correctas.
+- Paquete de pago: 17 pruebas correctas.
+- Inventario: 30 de 30 pruebas correctas.
+- Costos: 13 pruebas correctas.
+- Transacciones: 40 de 40 pruebas correctas.
+- Pruebas de facturación por usuario: cero fallos registrados, con una excepción documentada para GERENTE relacionada con el código `-6550`.
+
+## 14. Módulos adicionales del proyecto
+
+Los módulos adicionales, como Padrón, Notificaciones y jobs, deben adaptarse a la nueva arquitectura.
+
+Las referencias de conexión deben cambiar de:
+
+- Contenedor anterior: `eif402-oracle21c-oficial`.
+- Nueva primaria: `dg-primaria`.
+- PDB anterior: `XEPDB1`.
+- Nueva PDB: `ORCLPDB1`.
+
+Consideraciones:
+
+- El archivo utilizado por Padrón debe estar disponible en la primaria; la tabla correspondiente se replica, pero el archivo físico no.
+- El wallet SMTP debe existir en ambos contenedores en `/opt/oracle/wallets/smtp`.
+- Se debe volver a configurar `CORREO_ALERTAS_BD` y `CP_CONFIGURACION_CORREO`.
+- Se debe generar una nueva clave de cifrado.
+- Las claves de cifrado, las contraseñas y las claves de roles no se migran automáticamente.
+- Se encuentra pendiente completar la especificación de `PKG_CP_NOTIFICACIONES` y el privilegio `GRANT EXECUTE ON DBMS_LOCK` para CP_POS.
+- Los objetos que todavía aparezcan INVALID deben revisarse antes de considerar completa la instalación de estos módulos.
+
+## 15. Verificación de la instalación CP_POS
+
+### 15.1. Verificar las tablas
+
+Conectarse como CP_POS en la PDB `ORCLPDB1`:
+
+```sql
+SELECT COUNT(*)
+FROM user_tables;
+```
+
+La cantidad esperada según el proyecto es de 119 tablas.
+
+### 15.2. Revisar objetos inválidos
+
+```sql
+SELECT object_type, object_name
+FROM user_objects
+WHERE status = 'INVALID';
+```
+
+### 15.3. Verificar los archivos de datos
+
+```sql
+SELECT tablespace_name, file_name
+FROM dba_data_files
+WHERE tablespace_name LIKE 'CP_POS%';
+```
+
+## 16. Verificación de la replicación Data Guard
+
+La replicación se verifica generando actividad en la primaria y comprobando que la información llegue a la standby.
+
+### 16.1. Generar un cambio de redo
+
+En la primaria, desde SQL*Plus como SYSDBA:
+
+```sql
+ALTER SYSTEM ARCHIVE LOG CURRENT;
+```
+
+### 16.2. Verificar secuencias recibidas
+
+En la standby:
+
+```sql
+SELECT MAX(sequence#)
+FROM v$archived_log
+WHERE dest_id = 1;
+```
+
+### 16.3. Verificar secuencias aplicadas
+
+```sql
+SELECT MAX(sequence#)
+FROM v$archived_log
+WHERE applied = 'YES';
+```
+
+### 16.4. Consultar los retardos
+
+```sql
+SELECT name, value
+FROM v$dataguard_stats
+WHERE name IN ('transport lag', 'apply lag');
+```
+
+### 16.5. Verificar archivos de CP_POS en standby
+
+```sql
+SELECT name
+FROM v$datafile
+WHERE LOWER(name) LIKE '%cp_pos%';
+```
+
+## 17. Prueba de lectura en la standby
+
+Para verificar que la información de CP_POS está disponible en la standby, se puede realizar la prueba de lectura documentada.
+
+El procedimiento consiste en detener temporalmente la aplicación de redo, abrir la base standby en modo de solo lectura, abrir la PDB y consultar la información de CP_POS. Después se devuelve a MOUNT y se habilita nuevamente la aplicación de redo.
+
+Esta prueba debe realizarse teniendo en cuenta las condiciones de licencia de Oracle Active Data Guard. No debe confundirse la apertura temporal de solo lectura con el estado normal de aplicación de redo.
+
+## 18. Prueba final de failover automático (FSFO)
+
+Esta prueba demuestra el cambio de rol de la base de datos standby cuando la primaria deja de estar disponible.
+
+### 18.1. Verificar el estado inicial de la primaria
+
+En SQL Developer o PL/SQL Developer, conectado a la base primaria como SYS:
+
+```sql
+SELECT DATABASE_ROLE, OPEN_MODE
+FROM V$DATABASE;
+```
+
+El estado inicial esperado es:
+
+```text
+PRIMARY
+READ WRITE
+```
+
+### 18.2. Cambiar a la PDB
+
+```sql
+ALTER SESSION SET CONTAINER = ORCLPDB1;
+```
+
+### 18.3. Crear la tabla de prueba
+
+```sql
+CREATE TABLE FSFO_PRUEBA (
+    ID NUMBER PRIMARY KEY,
+    MENSAJE VARCHAR2(200),
+    FECHA DATE DEFAULT SYSDATE
+);
+```
+
+### 18.4. Insertar los registros antes del failover
+
+```sql
+INSERT INTO FSFO_PRUEBA (ID, MENSAJE)
+VALUES (1, 'Registro antes del failover');
+
+INSERT INTO FSFO_PRUEBA (ID, MENSAJE)
+VALUES (2, 'Prueba de replicacion Data Guard');
+
+INSERT INTO FSFO_PRUEBA (ID, MENSAJE)
+VALUES (3, 'Verificacion de FSFO');
+
+COMMIT;
+```
+
+### 18.5. Verificar la información
+
+```sql
+SELECT *
+FROM FSFO_PRUEBA
+ORDER BY ID;
+```
+
+Los tres registros deben estar guardados en la primaria y disponibles en la standby después de la replicación.
+
+### 18.6. Verificar el estado de FSFO
+
+Desde DGMGRL:
+
+```text
+SHOW CONFIGURATION;
+
+SHOW FAST_START FAILOVER;
+
+SHOW OBSERVER;
+```
+
+Se comprueba que FSFO esté habilitado y que el Observer esté activo.
+
+### 18.7. Simular la caída de la primaria
+
+Desde Windows PowerShell:
+
+```powershell
+docker kill dg-primaria
+```
+
+Este comando simula la caída del contenedor primario para comprobar el funcionamiento del failover.
+
+### 18.8. Verificar el cambio de rol
+
+Entrar al contenedor standby:
+
+```powershell
+docker exec -it dg-standby bash
+```
+
+Iniciar DGMGRL:
+
+```bash
+dgmgrl sys@standby_dg
+```
+
+Consultar:
+
+```text
+SHOW CONFIGURATION;
+```
+
+El resultado observado después de la caída mostró:
+
+- `ORCLSTBY` como Primary database.
+- `ORCLCDB` como Physical standby database que necesitaba reintegración.
+- FSFO habilitado en modo Zero Data Loss.
+- Estado de configuración WARNING mientras la antigua primaria se encontraba fuera de servicio.
+
+### 18.9. Verificar el rol de la nueva primaria
+
+Desde SQL Developer, conectado a ORCLSTBY:
+
+```sql
+SELECT DATABASE_ROLE, OPEN_MODE
+FROM V$DATABASE;
+```
+
+El resultado comprobado fue:
+
+```text
+PRIMARY
+READ WRITE
+```
+
+Cambiar a la PDB:
+
+```sql
+ALTER SESSION SET CONTAINER = ORCLPDB1;
+```
+
+Consultar los registros:
+
+```sql
+SELECT *
+FROM FSFO_PRUEBA
+ORDER BY ID;
+```
+
+Se verificó que los tres registros anteriores al failover estaban disponibles en la nueva primaria.
+
+### 18.10. Insertar un registro después del failover
+
+En la nueva primaria `ORCLSTBY`:
+
+```sql
+INSERT INTO FSFO_PRUEBA (ID, MENSAJE)
+VALUES (4, 'Registro insertado despues del failover');
+
+COMMIT;
+```
+
+Consultar nuevamente:
+
+```sql
+SELECT *
+FROM FSFO_PRUEBA
+ORDER BY ID;
+```
+
+El cuarto registro demuestra que la nueva primaria acepta operaciones de escritura después del failover.
+
+## 19. Recuperación de la antigua primaria
+
+Después de comprobar que `ORCLSTBY` funciona como primaria, se inicia nuevamente el contenedor anterior.
+
+### 19.1. Iniciar el contenedor
+
+Desde Windows PowerShell:
+
+```powershell
+docker start dg-primaria
+```
+
+Resultado observado:
+
+```text
+dg-primaria
+```
+
+El contenedor se inició sin eliminarlo ni recrearlo.
+
+### 19.2. Entrar al contenedor standby
+
+Desde Windows PowerShell:
+
+```powershell
+docker exec -it dg-standby bash
+```
+
+### 19.3. Comprobar la configuración mediante DGMGRL
+
+Desde el contenedor standby:
+
+```bash
+dgmgrl sys@standby_dg
+```
+
+Consultar el estado:
+
+```text
+SHOW CONFIGURATION;
+```
+
+La comprobación debe confirmar que:
+
+- `ORCLSTBY` continúa como primaria.
+- `ORCLCDB` vuelve a estar reconocida como standby físico.
+- La configuración Broker se encuentra en estado SUCCESS.
+
+### 19.4. Verificar la antigua primaria
+
+En DGMGRL:
+
+```text
+SHOW DATABASE VERBOSE ORCLCDB;
+```
+
+Se debe comprobar que la antigua primaria aparezca como `PHYSICAL STANDBY` y que la aplicación de redo esté activa.
+
+Si Broker informa que la base necesita reintegración y no la reintegra automáticamente, se debe revisar el estado y realizar la reintegración mediante el procedimiento correspondiente de Data Guard Broker antes de declarar finalizada la recuperación.
+
+### 19.5. Verificar la sincronización
+
+En DGMGRL:
+
+```text
+SHOW CONFIGURATION;
+
+SHOW DATABASE ORCLSTBY;
+
+SHOW DATABASE VERBOSE ORCLCDB;
+```
+
+La verificación final debe mostrar:
+
+- `ORCLSTBY` como PRIMARY.
+- `ORCLCDB` como PHYSICAL STANDBY.
+- Estado de aplicación `APPLY-ON`.
+- Transporte y aplicación de redo sin retrasos reportados.
+- Configuración en estado SUCCESS.
+
+### 19.6. Comprobar los cuatro registros en la antigua primaria
+
+Conectarse a la antigua primaria mediante SQL Developer, usando el puerto `1541` y el servicio `ORCLPDB1`.
+
+Comprobar el rol:
+
+```sql
+SELECT DATABASE_ROLE, OPEN_MODE
+FROM V$DATABASE;
+```
+
+La antigua primaria debe aparecer como standby físico.
+
+Cambiar a la PDB:
+
+```sql
+ALTER SESSION SET CONTAINER = ORCLPDB1;
+```
+
+Consultar los registros:
+
+```sql
+SELECT *
+FROM FSFO_PRUEBA
+ORDER BY ID;
+```
+
+La prueba final debe mostrar los cuatro registros, incluido:
+
+```text
+Registro insertado despues del failover
+```
+
+Esto demuestra que la antigua primaria volvió a sincronizarse con la nueva primaria después del failover.
+
+## 20. Resultados de las pruebas finales
+
+Los registros comprobados en la tabla `FSFO_PRUEBA` fueron:
+
+| ID | Mensaje | Fecha registrada |
+|---:|---|---|
+| 1 | Registro antes del failover | 11/11/2026 00:13:51 |
+| 2 | Prueba de replicacion Data Guard | 11/11/2026 00:13:51 |
+| 3 | Verificacion de FSFO | 11/11/2026 00:13:51 |
+| 4 | Registro insertado despues del failover | 11/11/2026 01:21:31 |
+
+### Evidencias obtenidas
+
+1. La primaria inicial aceptó los tres primeros registros.
+2. Los registros se encontraron disponibles en la base standby.
+3. FSFO detectó la caída de la primaria y realizó el cambio de rol.
+4. `ORCLSTBY` pasó a funcionar como `PRIMARY - READ WRITE`.
+5. Se insertó un cuarto registro después del failover.
+6. Se inició nuevamente el contenedor `dg-primaria`.
+7. Data Guard Broker permitió comprobar el estado de la antigua primaria y su proceso de reintegración.
+8. La consulta final de la tabla permitió comprobar los cuatro registros en la base recuperada.
+
+## 21. Prueba práctica de caída de la primaria y failover automático
+
+Esta sección documenta la ejecución práctica de la prueba realizada, en la que se detuvo el contenedor primario para comprobar que Data Guard pudiera promover automáticamente la standby y mantener la disponibilidad de la información.
+
+### 21.1. Comprobar el estado inicial
+
+Antes de provocar la caída, se verificó que la base original funcionara como primaria:
+
+```sql
+SELECT DATABASE_ROLE, OPEN_MODE
+FROM V$DATABASE;
+```
+
+El estado inicial comprobado fue `PRIMARY - READ WRITE`.
+
+También se verificó que los tres registros iniciales estuvieran guardados en `FSFO_PRUEBA`.
+
+### 21.2. Verificar que FSFO estuviera habilitado
+
+Desde DGMGRL:
+
+```text
+SHOW CONFIGURATION;
+SHOW FAST_START FAILOVER;
+SHOW OBSERVER;
+```
+
+Se verificó que Fast-Start Failover estuviera habilitado y que el Observer estuviera activo.
+
+### 21.3. Tumbar el contenedor primario
+
+Desde Windows PowerShell se ejecutó:
+
+```powershell
+docker kill dg-primaria
+```
+
+El comando detuvo abruptamente el contenedor `dg-primaria`, simulando la pérdida de disponibilidad de la base primaria.
+
+### 21.4. Comprobar que el standby se convirtió en primaria
+
+Se ingresó al contenedor standby:
+
+```powershell
+docker exec -it dg-standby bash
+```
+
+Se inició DGMGRL:
+
+```bash
+dgmgrl sys@standby_dg
+```
+
+Se consultó el estado:
+
+```text
+SHOW CONFIGURATION;
+```
+
+El resultado observado indicó que:
+
+- `ORCLSTBY` pasó a ser la nueva base de datos PRIMARY.
+- `ORCLCDB` quedó identificada como la antigua standby física, pendiente de reintegración.
+- FSFO continuó habilitado en modo Zero Data Loss.
+- La configuración mostró temporalmente el estado WARNING porque la antigua primaria estaba fuera de servicio.
+
+### 21.5. Comprobar que la nueva primaria aceptara escrituras
+
+Desde SQL Developer se estableció una conexión con `ORCLSTBY`.
+
+Se consultó el rol:
+
+```sql
+SELECT DATABASE_ROLE, OPEN_MODE
+FROM V$DATABASE;
+```
+
+Resultado comprobado:
+
+```text
+PRIMARY
+READ WRITE
+```
+
+Se cambió a la PDB:
+
+```sql
+ALTER SESSION SET CONTAINER = ORCLPDB1;
+```
+
+Se consultaron los registros:
+
+```sql
+SELECT *
+FROM FSFO_PRUEBA
+ORDER BY ID;
+```
+
+Se encontraron los tres registros insertados antes del failover.
+
+Se insertó el cuarto registro:
+
+```sql
+INSERT INTO FSFO_PRUEBA (ID, MENSAJE)
+VALUES (4, 'Registro insertado despues del failover');
+
+COMMIT;
+```
+
+Se confirmó que la nueva primaria aceptó la escritura y que la tabla contenía cuatro registros.
+
+### 21.6. Recuperar la antigua primaria
+
+Desde Windows PowerShell se inició nuevamente el contenedor:
+
+```powershell
+docker start dg-primaria
+```
+
+Resultado obtenido:
+
+```text
+dg-primaria
+```
+
+El contenedor se inició sin eliminarlo ni recrearlo.
+
+### 21.7. Comprobar la reintegración mediante DGMGRL
+
+Se ingresó al contenedor standby:
+
+```powershell
+docker exec -it dg-standby bash
+```
+
+Se abrió DGMGRL:
+
+```bash
+dgmgrl sys@standby_dg
+```
+
+Se consultó la configuración:
+
+```text
+SHOW CONFIGURATION;
+SHOW DATABASE VERBOSE ORCLCDB;
+SHOW DATABASE ORCLSTBY;
+```
+
+Se verificó el estado de la antigua primaria y su reintegración como standby físico. La recuperación solo se considera confirmada cuando Broker muestra el rol correcto y la aplicación de redo está activa.
+
+### 21.8. Comprobar los cuatro registros en la antigua primaria
+
+Una vez recuperada y sincronizada, se conectó SQL Developer a la antigua primaria, mediante el puerto `1541` y el servicio `ORCLPDB1`.
+
+Se comprobó su rol:
+
+```sql
+SELECT DATABASE_ROLE, OPEN_MODE
+FROM V$DATABASE;
+```
+
+Luego se seleccionó la PDB:
+
+```sql
+ALTER SESSION SET CONTAINER = ORCLPDB1;
+```
+
+Finalmente, se consultaron los registros:
+
+```sql
+SELECT *
+FROM FSFO_PRUEBA
+ORDER BY ID;
+```
+
+Se verificó la presencia de los cuatro registros, incluido el que fue insertado después del failover.
+
+### 21.9. Evidencia de los registros
+
+| ID | Mensaje | Fecha registrada |
+|---:|---|---|
+| 1 | Registro antes del failover | 11/11/2026 00:13:51 |
+| 2 | Prueba de replicacion Data Guard | 11/11/2026 00:13:51 |
+| 3 | Verificacion de FSFO | 11/11/2026 00:13:51 |
+| 4 | Registro insertado despues del failover | 11/11/2026 01:21:31 |
+
+### 21.10. Conclusión de la prueba
+
+La prueba permitió comprobar el comportamiento de Oracle Data Guard ante la caída de la base primaria:
+
+1. La base original `ORCLCDB` funcionaba como primaria.
+2. Se detuvo el contenedor `dg-primaria` mediante `docker kill`.
+3. FSFO promovió `ORCLSTBY` a la función de primaria.
+4. Los tres registros anteriores al failover estuvieron disponibles en la nueva primaria.
+5. La nueva primaria permitió insertar y confirmar un cuarto registro.
+6. Se inició nuevamente el contenedor `dg-primaria`.
+7. Se verificó mediante Data Guard Broker el proceso de recuperación y reintegración de la antigua primaria.
+8. Se comprobaron los cuatro registros en la base recuperada.
+
+**Resultado:** se comprobó el failover automático y la capacidad de la nueva primaria para continuar recibiendo escrituras. La sincronización posterior de la antigua primaria se valida mediante el estado de Data Guard Broker y la consulta final de los registros.
