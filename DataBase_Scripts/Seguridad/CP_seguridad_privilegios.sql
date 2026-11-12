@@ -8,7 +8,8 @@
 --
 -- EJECUTAR COMO: SYS en XEPDB1
 --                Es re-ejecutable: correr al final, despues de cada
---                script que cree tablas nuevas (por ejemplo el 14).
+--                script que cree tablas nuevas (por ejemplo el 14) o
+--                paquetes y vistas de los scripts 25 al 34.
 -- ============================================================
 
 SET SERVEROUTPUT ON SIZE UNLIMITED
@@ -28,7 +29,7 @@ DECLARE
         'CATALOGOS ESTRUCTURA PERSONAS CLIENTES CREDITOS_CLIENTE '
         || 'PROVEEDORES PRODUCTOS PRECIOS INVENTARIO COMPRAS VENTAS '
         || 'DEVOLUCIONES_VENTA PROMOCIONES CIERRE PADRON AUDITORIA '
-        || 'SEGURIDAD_APP SISTEMA';
+        || 'SEGURIDAD_APP SISTEMA REPORTES AUDITORIA_P2';
 
     v_total        PLS_INTEGER := 0;
     v_unclassified PLS_INTEGER := 0;
@@ -111,7 +112,12 @@ DECLARE
             WHEN 'SISTEMA' THEN
                 'CP_CONFIGURACION_CORREO CP_DESTINATARIO_NOTIFICACION '
                 || 'CP_NOTIFICACION CP_NOTIFICACION_DESTINATARIO '
-                || 'CP_LLAVE_CIFRADO CP_PARAMETRO'
+                || 'CP_LLAVE_CIFRADO CP_PARAMETRO CP_PADRON_EXTERNO '
+                || 'CP_MONITOREO_TABLESPACE'
+            WHEN 'REPORTES' THEN
+                'MV_CP_VENTAS_MENSUALES MV_CP_INVENTARIO_CONSOLIDADO'
+            WHEN 'AUDITORIA_P2' THEN
+                'CP_BITACORA_COMPRA'
             ELSE NULL
         END;
     END module_objects;
@@ -232,17 +238,66 @@ BEGIN
     apply_access('ROL_CP_GERENTE', 'PADRON',             'L');
     apply_access('ROL_CP_GERENTE', 'AUDITORIA',          'L');
 
-    -- La API de facturacion (script 25) es un paquete, no una tabla:
-    -- revoke_all le quita el EXECUTE a los roles, asi que se otorga de nuevo.
-    -- Solo lo reciben los roles que registran documentos.
-    FOR r IN (SELECT object_name
-              FROM dba_objects
-              WHERE owner = c_owner
-                AND object_name = 'PKG_CP_FACTURACION'
-                AND object_type = 'PACKAGE') LOOP
-        grant_object('EXECUTE', r.object_name, 'ROL_CP_DIGITADOR');
-        grant_object('EXECUTE', r.object_name, 'ROL_CP_JEFE_DEPARTAMENTO');
-        grant_object('EXECUTE', r.object_name, 'ROL_CP_JEFE_PROVEEDURIA');
+    -- Los paquetes y la vista de los scripts 25 al 30 no estan en los
+    -- modulos de tablas: revoke_all tambien les quita los privilegios, asi
+    -- que se otorgan de nuevo aqui. Cada otorgamiento revisa primero que
+    -- el objeto exista, para que este script no falle si se ejecuta antes
+    -- de crearlos (volver a correrlo al final los incluye).
+    --   PKG_CP_FACTURACION (25): registran documentos DIGITADOR, JEFE_DEPTO y PROVEEDURIA
+    --   PKG_CP_PROMOCION (30): consulta de acciones, los cuatro roles
+    --   PKG_CP_VENCIMIENTO (28): reportes de lotes, GERENTE, JEFE_DEPTO y PROVEEDURIA
+    --   PKG_CP_CIERRE (27), PKG_CP_DESCUENTO (29) y PKG_CP_PREMIACION (31):
+    --     modifican datos, solo JEFE_DEPTO
+    --   VW_CP_ACCIONES_PROMOCION (30): lectura, los cuatro roles
+    --   VW_CP_VENTA_NETA_FACTURA (31): lectura, GERENTE y JEFE_DEPTO
+    --   VW_CP_CLIENTE_PADRON (padron): lectura, DIGITADOR, JEFE_DEPTO y GERENTE
+    --   MV_CP_VENTAS_MENSUALES (34): lectura, GERENTE y JEFE_DEPTO
+    --   MV_CP_INVENTARIO_CONSOLIDADO (34): lectura, GERENTE, JEFE_DEPTO y PROVEEDURIA
+    --   Las vistas materializadas tambien son tablas: el modulo REPORTES solo
+    --   las clasifica, sus privilegios se otorgan aqui
+    --   CP_BITACORA_COMPRA (35): lectura, GERENTE (como las bitacoras de la
+    --   Parte 1); va aqui y no en AUDITORIA para no fallar si el 35 no ha corrido
+    FOR r IN (SELECT o.object_name, o.object_type, g.role_name
+              FROM dba_objects o
+              JOIN (SELECT 'PKG_CP_FACTURACION' AS obj, 'ROL_CP_DIGITADOR' AS role_name FROM dual
+                    UNION ALL SELECT 'PKG_CP_FACTURACION', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'PKG_CP_FACTURACION', 'ROL_CP_JEFE_PROVEEDURIA' FROM dual
+                    UNION ALL SELECT 'PKG_CP_PROMOCION', 'ROL_CP_DIGITADOR' FROM dual
+                    UNION ALL SELECT 'PKG_CP_PROMOCION', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'PKG_CP_PROMOCION', 'ROL_CP_JEFE_PROVEEDURIA' FROM dual
+                    UNION ALL SELECT 'PKG_CP_PROMOCION', 'ROL_CP_GERENTE' FROM dual
+                    UNION ALL SELECT 'PKG_CP_VENCIMIENTO', 'ROL_CP_GERENTE' FROM dual
+                    UNION ALL SELECT 'PKG_CP_VENCIMIENTO', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'PKG_CP_VENCIMIENTO', 'ROL_CP_JEFE_PROVEEDURIA' FROM dual
+                    UNION ALL SELECT 'PKG_CP_CIERRE', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'PKG_CP_DESCUENTO', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'PKG_CP_PREMIACION', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'VW_CP_VENTA_NETA_FACTURA', 'ROL_CP_GERENTE' FROM dual
+                    UNION ALL SELECT 'VW_CP_VENTA_NETA_FACTURA', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'VW_CP_ACCIONES_PROMOCION', 'ROL_CP_DIGITADOR' FROM dual
+                    UNION ALL SELECT 'VW_CP_ACCIONES_PROMOCION', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'VW_CP_ACCIONES_PROMOCION', 'ROL_CP_JEFE_PROVEEDURIA' FROM dual
+                    UNION ALL SELECT 'VW_CP_ACCIONES_PROMOCION', 'ROL_CP_GERENTE' FROM dual
+                    UNION ALL SELECT 'VW_CP_CLIENTE_PADRON', 'ROL_CP_DIGITADOR' FROM dual
+                    UNION ALL SELECT 'VW_CP_CLIENTE_PADRON', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'VW_CP_CLIENTE_PADRON', 'ROL_CP_GERENTE' FROM dual
+                    UNION ALL SELECT 'MV_CP_VENTAS_MENSUALES', 'ROL_CP_GERENTE' FROM dual
+                    UNION ALL SELECT 'MV_CP_VENTAS_MENSUALES', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'MV_CP_INVENTARIO_CONSOLIDADO', 'ROL_CP_GERENTE' FROM dual
+                    UNION ALL SELECT 'MV_CP_INVENTARIO_CONSOLIDADO', 'ROL_CP_JEFE_DEPARTAMENTO' FROM dual
+                    UNION ALL SELECT 'MV_CP_INVENTARIO_CONSOLIDADO', 'ROL_CP_JEFE_PROVEEDURIA' FROM dual
+                    UNION ALL SELECT 'CP_BITACORA_COMPRA', 'ROL_CP_GERENTE' FROM dual) g
+                ON g.obj = o.object_name
+              WHERE o.owner = c_owner
+                AND o.object_type IN ('PACKAGE', 'VIEW', 'MATERIALIZED VIEW', 'TABLE')
+                -- la tabla interna de una vista materializada no se cuenta dos veces
+                AND NOT (o.object_type = 'TABLE'
+                         AND EXISTS (SELECT 1 FROM dba_mviews m
+                                     WHERE m.owner = o.owner
+                                       AND m.mview_name = o.object_name))
+              ORDER BY o.object_name, g.role_name) LOOP
+        grant_object(CASE r.object_type WHEN 'PACKAGE' THEN 'EXECUTE' ELSE 'SELECT' END,
+                     r.object_name, r.role_name);
     END LOOP;
 
     FOR i IN 1 .. REGEXP_COUNT(c_modules, '[^ ]+') LOOP
@@ -282,3 +337,19 @@ WHERE owner = 'CP_POS'
   AND (privilege = 'DELETE'
        OR table_name IN ('CP_USUARIO', 'CP_CONFIGURACION_CORREO',
                        'CP_LLAVE_CIFRADO', 'CP_PARAMETRO'));
+
+-- Paquetes y vista de negocio por rol (esperado: FACTURACION 3, PROMOCION 4,
+-- VENCIMIENTO 3, CIERRE 1, DESCUENTO 1, PREMIACION 1, VW_CP_ACCIONES_PROMOCION 4,
+-- VW_CP_VENTA_NETA_FACTURA 2, VW_CP_CLIENTE_PADRON 3, MV_CP_VENTAS_MENSUALES 2,
+-- MV_CP_INVENTARIO_CONSOLIDADO 3, CP_BITACORA_COMPRA 1)
+SELECT table_name AS objeto, privilege, COUNT(*) AS roles
+FROM dba_tab_privs
+WHERE owner = 'CP_POS'
+  AND grantee LIKE 'ROL_CP_%'
+  AND table_name IN ('PKG_CP_FACTURACION', 'PKG_CP_PROMOCION', 'PKG_CP_VENCIMIENTO',
+                     'PKG_CP_CIERRE', 'PKG_CP_DESCUENTO', 'PKG_CP_PREMIACION',
+                     'VW_CP_ACCIONES_PROMOCION', 'VW_CP_VENTA_NETA_FACTURA',
+                     'VW_CP_CLIENTE_PADRON', 'MV_CP_VENTAS_MENSUALES',
+                     'MV_CP_INVENTARIO_CONSOLIDADO', 'CP_BITACORA_COMPRA')
+GROUP BY table_name, privilege
+ORDER BY table_name;

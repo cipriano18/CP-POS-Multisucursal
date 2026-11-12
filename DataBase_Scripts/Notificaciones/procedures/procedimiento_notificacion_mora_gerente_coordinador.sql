@@ -10,6 +10,10 @@ AS
     v_mensaje            VARCHAR2(32767);
     v_cantidad           NUMBER := 0;
 
+    -- Dias sin abonar para considerar moroso a un cliente (parametrizado;
+    -- el cursor lo lee al abrirse, por eso se declara antes que el).
+    v_dias               NUMBER := PKG_CP_PARAMETRO.obtener_numero('MOROSIDAD_DIAS_SIN_PAGO');
+
     CURSOR c_clientes IS
         WITH ABONOS AS (
             SELECT cc.id_cuenta_cobrar,
@@ -87,7 +91,7 @@ AS
         WHERE NVL(
                   cc.fecha_ultimo_abono,
                   cc.fecha_primera_cuenta
-              ) < TRUNC(SYSDATE) - 30
+              ) < TRUNC(SYSDATE) - v_dias
         ORDER BY dias_sin_abonar DESC;
 
 BEGIN
@@ -164,7 +168,7 @@ BEGIN
         CHR(10) || CHR(10) ||
         'Notificacion dirigida al gerente y al coordinador.' ||
         CHR(10) ||
-        'Se muestran clientes con cuentas vencidas y mas de 30 dias ' ||
+        'Se muestran clientes con cuentas vencidas y mas de ' || v_dias || ' dias ' ||
         'sin realizar abonos.' ||
         CHR(10) || CHR(10);
 

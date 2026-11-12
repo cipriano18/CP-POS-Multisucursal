@@ -3,6 +3,9 @@ AUTHID DEFINER
 IS
     v_id_configuracion NUMBER;
     v_id_destinatario  NUMBER;
+
+    -- Porcentaje del limite de credito que dispara la alerta (parametrizado)
+    v_umbral           NUMBER := PKG_CP_PARAMETRO.obtener_numero('UMBRAL_CXC_CLIENTE_PCT');
 BEGIN
 
     /* ============================================================
@@ -22,7 +25,7 @@ BEGIN
 
 
     /* ============================================================
-       2. Buscar creditos con uso >= 85%
+       2. Buscar creditos con uso >= UMBRAL_CXC_CLIENTE_PCT
           El saldo se calcula:
           total factura - abonos realizados
        ============================================================ */
@@ -114,7 +117,7 @@ BEGIN
                     )
                 )
                 / cc.limite_credito
-            ) >= 0.85
+            ) >= v_umbral / 100
     )
     LOOP
 
@@ -187,7 +190,7 @@ BEGIN
         SELECT
             v_id_configuracion,
 
-            'Alerta de credito >= 85% - Credito '
+            'Alerta de credito >= ' || v_umbral || '% - Credito '
                 || r.id_credito_cliente,
 
             'Estimado cliente.' || CHR(10) || CHR(10)
@@ -223,7 +226,7 @@ BEGIN
             FROM CP_NOTIFICACION n
             WHERE n.tipo_notificacion = 'ALERTA_CREDITO_85'
               AND n.asunto =
-                    'Alerta de credito >= 85% - Credito '
+                    'Alerta de credito >= ' || v_umbral || '% - Credito '
                     || r.id_credito_cliente
               AND TRUNC(CAST(n.fecha_creacion AS DATE))
                     = TRUNC(SYSDATE)
@@ -246,7 +249,7 @@ BEGIN
         FROM CP_NOTIFICACION n
         WHERE n.tipo_notificacion = 'ALERTA_CREDITO_85'
           AND n.asunto =
-                'Alerta de credito >= 85% - Credito '
+                'Alerta de credito >= ' || v_umbral || '% - Credito '
                 || r.id_credito_cliente
           AND TRUNC(CAST(n.fecha_creacion AS DATE))
                 = TRUNC(SYSDATE)

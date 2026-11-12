@@ -6,6 +6,10 @@ AS
     v_asunto                CP_NOTIFICACION.ASUNTO%TYPE;
     v_mensaje               CP_NOTIFICACION.MENSAJE%TYPE;
 
+    -- Dias sin pagar para considerar moroso a un cliente (parametrizado;
+    -- el cursor lo lee al abrirse, por eso se declara antes que el).
+    v_dias                  NUMBER := PKG_CP_PARAMETRO.obtener_numero('MOROSIDAD_DIAS_SIN_PAGO');
+
     CURSOR c_clientes_mora IS
         WITH ULTIMO_PAGO AS (
             SELECT
@@ -52,7 +56,7 @@ AS
             ON tc.id_tipo_contacto = co.id_tipo_contacto
         WHERE tc.nombre_tipo_contacto = 'CORREO'
           AND NVL(up.fecha_ultimo_pago, up.fecha_primera_cuenta)
-              < TRUNC(SYSDATE) - 30
+              < TRUNC(SYSDATE) - v_dias
           AND EXISTS (
               SELECT 1
               FROM CP_CONFIGURACION_CORREO cc
@@ -81,7 +85,7 @@ BEGIN
             'Estimado cliente:' || CHR(10) || CHR(10) ||
             'Le informamos que registra una o mas cuentas por cobrar vencidas.' ||
             CHR(10) ||
-            'Su ultimo abono registrado, o la fecha de creacion de su primera cuenta si nunca ha abonado, supera los 30 dias.' ||
+            'Su ultimo abono registrado, o la fecha de creacion de su primera cuenta si nunca ha abonado, supera los ' || v_dias || ' dias.' ||
             CHR(10) || CHR(10) ||
             'Por favor, comuniquese con nuestro negocio para regularizar su situacion.' ||
             CHR(10) || CHR(10) ||

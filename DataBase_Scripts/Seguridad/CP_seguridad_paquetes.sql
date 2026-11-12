@@ -16,7 +16,7 @@
 -- ============================================================
 -- Registra errores en CP_BITACORA_ERROR sin que un ROLLBACK los borre
 -- y permite registrar y lanzar un error propio en un solo paso.
--- Los errores propios (-20200 a -20299) no se vuelven a registrar.
+-- Los errores propios (-20200 a -20399) no se vuelven a registrar.
 
 CREATE OR REPLACE PACKAGE PKG_CP_ERROR AUTHID DEFINER AS
 
@@ -129,7 +129,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_ERROR AS
     IS
     BEGIN
 
-        IF SQLCODE NOT BETWEEN -20299 AND -20200 THEN
+        IF SQLCODE NOT BETWEEN -20399 AND -20200 THEN
             registrar_excepcion(p_modulo, p_contexto);
         END IF;
 

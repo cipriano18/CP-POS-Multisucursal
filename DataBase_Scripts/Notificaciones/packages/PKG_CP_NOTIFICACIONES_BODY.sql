@@ -49,7 +49,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
         ELSE
             RAISE_APPLICATION_ERROR(
                 -20050,
-                'La configuraciï¿½n SMTP debe utilizar TLS.'
+                'La configuracion SMTP debe utilizar TLS.'
             );
         END IF;
 
@@ -130,7 +130,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
         END liberar_bloqueo;
 
     BEGIN
-        -- Bloqueo exclusivo de la ejecuciï¿½n.
+        -- Bloqueo exclusivo de la ejecucion.
         -- No se libera mediante COMMIT ni ROLLBACK.
         v_lock_result := DBMS_LOCK.REQUEST(
             id                => v_lock_id,
@@ -141,13 +141,13 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
 
         IF v_lock_result = 1 THEN
             DBMS_OUTPUT.PUT_LINE(
-                'Ya existe otra ejecuciï¿½n procesando notificaciones.'
+                'Ya existe otra ejecucion procesando notificaciones.'
             );
             RETURN;
         ELSIF v_lock_result <> 0 THEN
             RAISE_APPLICATION_ERROR(
                 -20055,
-                'No se pudo obtener el bloqueo. Cï¿½digo: ' ||
+                'No se pudo obtener el bloqueo. Codigo: ' ||
                 v_lock_result
             );
         END IF;
@@ -255,6 +255,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
         v_id_configuracion NUMBER;
         v_id_contacto      NUMBER;
         v_id_destinatario  NUMBER;
+        v_id_notificacion  NUMBER;
     BEGIN
         -- Validar los datos recibidos.
         IF p_correo IS NULL OR TRIM(p_correo) IS NULL THEN
@@ -271,7 +272,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
             );
         END IF;
 
-        -- Obtener la configuraciï¿½n de correo activa.
+        -- Obtener la configuracion de correo activa.
         SELECT ID_CONFIGURACION_CORREO
           INTO v_id_configuracion
           FROM CP_CONFIGURACION_CORREO
@@ -292,9 +293,11 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
          WHERE ID_CONTACTO = v_id_contacto
            AND ACTIVO = 'S';
 
-        -- Insertar la notificaciï¿½n.
-        -- Se omite ID_NOTIFICACION suponiendo que la tabla
-        -- lo genera mediante una columna IDENTITY o un trigger.
+        -- Insertar la notificacion. El id lo pone el DEFAULT de la
+        -- columna (SEQ_CP_NOTIFICACION.NEXTVAL) y RETURNING devuelve
+        -- exactamente ese valor. No se usa SELECT MAX(...): con dos
+        -- sesiones encolando a la vez, MAX puede devolver el id de la
+        -- otra sesion y el destinatario quedaria en el aviso equivocado.
         INSERT INTO CP_NOTIFICACION (
             ID_CONFIGURACION_CORREO,
             ASUNTO,
@@ -307,18 +310,17 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
             p_mensaje,
             p_tipo,
             SYSTIMESTAMP
-        );
+        )
+        RETURNING ID_NOTIFICACION INTO v_id_notificacion;
 
-        -- Insertar la relaciï¿½n con el destinatario.
-        -- Se omite ID_NOTIFICACION_DESTINATARIO suponiendo
-        -- que la tabla lo genera mediante una columna IDENTITY o un trigger.
+        -- Insertar la relacion con el destinatario (su id tambien sale
+        -- del DEFAULT con SEQ_CP_NOTIFICACION_DESTINATARIO.NEXTVAL).
         INSERT INTO CP_NOTIFICACION_DESTINATARIO (
             ID_NOTIFICACION,
             ID_DESTINATARIO,
             ESTADO_ENVIO
         ) VALUES (
-            (SELECT MAX(ID_NOTIFICACION)
-               FROM CP_NOTIFICACION),
+            v_id_notificacion,
             v_id_destinatario,
             'PENDIENTE'
         );
@@ -343,4 +345,6 @@ CREATE OR REPLACE PACKAGE BODY PKG_CP_NOTIFICACIONES AS
     END encolar;
 
 END PKG_CP_NOTIFICACIONES;
+/
 
+SHOW ERRORS PACKAGE BODY PKG_CP_NOTIFICACIONES
