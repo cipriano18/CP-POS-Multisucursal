@@ -18,23 +18,65 @@
 --                activacion de roles (SET ROLE).
 --              - POL_CP_ACCESO_FALLIDO: inicios de sesion fallidos.
 --
--- EJECUTAR COMO: SYS en XEPDB1, despues del 35 (las tablas deben existir).
+-- EJECUTAR COMO: SYS AS SYSDBA en ORCLPDB1, despues del 35 (las tablas deben existir).
 --                Se puede volver a ejecutar: borra y crea las politicas.
 -- ============================================================
 
-SET SERVEROUTPUT ON SIZE UNLIMITED
+-- ============================================================
+-- 1. PREVALIDACION DEL MODO DE AUDITORIA
+-- ============================================================
+-- FALSE en V$OPTION significa que el binario no esta en modo puro.
+-- Para que las politicas unificadas escriban en modo mixto, AUDIT_TRAIL
+-- debe estar habilitado. Si vale NONE, el script se detiene ANTES de
+-- borrar o recrear politicas. Este script no cambia parametros ni reinicia.
 
--- ============================================================
--- 1. MODO DE AUDITORIA
--- ============================================================
--- FALSE = modo mixto (el de una instalacion normal). Las politicas
--- unificadas funcionan igual; solo cambia si la auditoria tradicional
--- sigue activa al mismo tiempo.
+SET SERVEROUTPUT ON SIZE UNLIMITED
+WHENEVER SQLERROR EXIT SQL.SQLCODE
+VARIABLE g_fallas NUMBER
 
 SELECT parameter, value
 FROM   v$option
 WHERE  parameter = 'Unified Auditing';
 
+SELECT name, value
+FROM   v$parameter
+WHERE  name = 'audit_trail';
+
+DECLARE
+    v_unified  VARCHAR2(10);
+    v_audit    VARCHAR2(30);
+    v_user     VARCHAR2(30);
+    v_container VARCHAR2(128);
+    v_isdba    VARCHAR2(10);
+BEGIN
+    SELECT value INTO v_unified
+    FROM v$option
+    WHERE parameter = 'Unified Auditing';
+
+    SELECT value INTO v_audit
+    FROM v$parameter
+    WHERE name = 'audit_trail';
+
+    v_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
+    v_container := SYS_CONTEXT('USERENV', 'CON_NAME');
+    v_isdba := SYS_CONTEXT('USERENV', 'ISDBA');
+
+    IF v_user <> 'SYS' OR v_isdba <> 'TRUE' THEN
+        RAISE_APPLICATION_ERROR(-20997,
+            'Conectese como SYS AS SYSDBA antes de ejecutar este script.');
+    END IF;
+
+    IF v_container <> 'ORCLPDB1' THEN
+        RAISE_APPLICATION_ERROR(-20996,
+            'Conectese al servicio de la PDB ORCLPDB1 antes de ejecutar este script.');
+    END IF;
+
+    IF UPPER(v_unified) <> 'TRUE' AND UPPER(NVL(v_audit, 'NONE')) = 'NONE' THEN
+        RAISE_APPLICATION_ERROR(-20998,
+            'Auditoria no disponible: Unified Auditing no esta en modo puro y AUDIT_TRAIL=NONE. Configure el modo de auditoria en una ventana de mantenimiento y vuelva a ejecutar. No se modificaron las politicas.');
+    END IF;
+END;
+/
 -- ============================================================
 -- 2. BORRADO PREVIO DE LAS POLITICAS
 -- ============================================================
@@ -163,6 +205,7 @@ DECLARE
     v_count  NUMBER;
     v_before NUMBER;
     v_after  NUMBER;
+    v_rows   NUMBER;
 
     PROCEDURE reportar(
         p_prueba IN VARCHAR2,
@@ -188,7 +231,7 @@ DECLARE
         DBMS_AUDIT_MGMT.FLUSH_UNIFIED_AUDIT_TRAIL;
     EXCEPTION
         WHEN OTHERS THEN
-            NULL;
+            DBMS_OUTPUT.PUT_LINE('Aviso: no se pudo vaciar la cola de auditoria: ' || SQLERRM);
     END flush_trail;
 
     FUNCTION audited(
@@ -204,6 +247,7 @@ DECLARE
         FROM unified_audit_trail
         WHERE unified_audit_policies LIKE '%' || p_policy || '%'
           AND action_name = p_action
+          AND dbusername = SYS_CONTEXT('USERENV', 'SESSION_USER')
           AND (p_object IS NULL OR object_name = p_object);
         RETURN v_total;
     END audited;
@@ -230,13 +274,15 @@ BEGIN
     UPDATE CP_POS.CP_PARAMETRO
     SET valor = valor
     WHERE codigo_parametro = 'TABLESPACE_UMBRAL_PCT';
+    v_rows := SQL%ROWCOUNT;
+    DBMS_OUTPUT.PUT_LINE('Filas de CP_PARAMETRO afectadas: ' || v_rows);
     ROLLBACK;
 
     flush_trail;
     v_after := audited('POL_CP_DATOS_CRITICOS', 'UPDATE', 'CP_PARAMETRO');
 
     reportar('3. Un cambio en CP_PARAMETRO queda auditado aunque se deshaga',
-             v_after > v_before);
+             v_after > v_before AND v_rows = 1);
 
     flush_trail;
     v_before := audited('POL_CP_SEGURIDAD', 'CREATE ROLE', NULL)
@@ -254,6 +300,7 @@ BEGIN
 
     DBMS_OUTPUT.PUT_LINE(CHR(10) || 'Resultado: ' || v_ok || ' OK, '
                          || v_falla || ' FALLA');
+    :g_fallas := v_falla;
 
 EXCEPTION
     WHEN OTHERS THEN
@@ -294,3 +341,12 @@ FROM   unified_audit_trail
 WHERE  unified_audit_policies LIKE '%POL_CP_%'
 ORDER  BY event_timestamp DESC
 FETCH FIRST 20 ROWS ONLY;
+
+-- El script debe terminar con error si alguna prueba funcional falla.
+BEGIN
+    IF NVL(:g_fallas, 0) > 0 THEN
+        RAISE_APPLICATION_ERROR(-20999,
+            'Fallaron pruebas de auditoria. Revise la salida anterior.');
+    END IF;
+END;
+/

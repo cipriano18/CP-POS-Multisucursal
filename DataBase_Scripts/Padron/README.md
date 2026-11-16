@@ -81,14 +81,32 @@ La tabla `CP_PADRON_NACIONAL` y su secuencia ya existen desde los scripts de la 
 ## 4. Requisitos
 
 - Base instalada con los scripts de la Parte 1 y el script 15 (`PKG_CP_ERROR` y `PKG_CP_PARAMETRO`).
-- Contenedor de Oracle en ejecución: `eif402-oracle21c-oficial` (XE, PDB `XEPDB1`) o `dg-primaria` (Enterprise, PDB `ORCLPDB1`).
+- Contenedor de Oracle en ejecución: `dg-primaria` (Enterprise, PDB `ORCLPDB1`). El procedimiento alternativo para XE (`eif402-oracle21c-oficial`, PDB `XEPDB1`) se puede usar solo si se instala allí el módulo por separado.
 - Archivo del padrón completo descargado del TSE.
+
+### Estado de esta instalación
+
+El módulo y la carga de referencia quedaron instalados en el entorno Enterprise del proyecto, PDB `ORCLPDB1`, el 16 de noviembre de 2026. El archivo fuente se encontraba en la carpeta de descargas del usuario y se copió al contenedor como `/tmp/padron/PADRON_COMPLETO.txt`.
+
+Resultado informado por `PKG_CP_PADRON.load_file`:
+
+| Métrica | Resultado |
+|---|---:|
+| Líneas leídas | 3,764,647 |
+| Válidas | 3,764,647 |
+| Inválidas | 0 |
+| Repetidas | 0 |
+| Insertadas | 3,764,647 |
+| Actualizadas | 0 |
+| Personas enlazadas | 15 |
+
+Las 18 pruebas de instalación terminaron con `18 OK, 0 FALLA`; los objetos del módulo quedaron válidos. Después se ejecutó como SYS el script `Seguridad/CP_seguridad_privilegios.sql`, que otorgó `SELECT` sobre `VW_CP_CLIENTE_PADRON` a los roles `ROL_CP_DIGITADOR`, `ROL_CP_GERENTE` y `ROL_CP_JEFE_DEPARTAMENTO`. La verificación posterior como `CP_POS` encontró 3,764,647 filas en `CP_PADRON_NACIONAL` y 15 personas enlazadas.
 
 ## 5. Descargar y preparar el padrón
 
 1. Entrar a la página oficial del TSE: https://www.tse.go.cr/descarga_padron.html
 2. Descargar el ZIP del padrón nacional completo y extraerlo.
-3. Crear la carpeta `C:\padron` y copiar ahí el TXT del padrón completo con el nombre `PADRON_COMPLETO.txt`.
+3. Extraer el archivo en una carpeta local y conservarlo con el nombre `PADRON_COMPLETO.txt`. Los comandos de la siguiente sección suponen que está en `Downloads\padron_completo` dentro del perfil del usuario de Windows; cambie esa carpeta si guardó el archivo en otro lugar.
 
 Cada línea del archivo tiene 8 campos separados por coma, rellenos con espacios:
 
@@ -100,32 +118,39 @@ Se usan la cédula, el código electoral, el nombre y los dos apellidos; los otr
 
 ## 6. Copiar el archivo al contenedor
 
-En PowerShell. Para la instalación Enterprise, cambie `eif402-oracle21c-oficial` por `dg-primaria`.
+En PowerShell. Ajuste `$contenedor` al nombre del contenedor Oracle que usa su proyecto. En este ejemplo, el servicio de la base es `ORCLPDB1`.
+
+```powershell
+$contenedor = 'dg-primaria'
+$archivoPadron = Join-Path $env:USERPROFILE 'Downloads\padron_completo\PADRON_COMPLETO.txt'
+```
 
 **Paso 1. Crear la carpeta dentro del contenedor.**
 
 ```powershell
-docker exec -u 0 eif402-oracle21c-oficial mkdir -p /tmp/padron
+docker exec --user root $contenedor mkdir -p /tmp/padron
 ```
 
 **Paso 2. Copiar el archivo.**
 
 ```powershell
-docker cp "C:\padron\PADRON_COMPLETO.txt" eif402-oracle21c-oficial:/tmp/padron/PADRON_COMPLETO.txt
+docker cp $archivoPadron "${contenedor}:/tmp/padron/PADRON_COMPLETO.txt"
 ```
 
 **Paso 3. Dar la carpeta al usuario `oracle`.** Oracle no solo lee el archivo: también escribe ahí el registro de la carga (`padron_carga.log`) y las líneas rechazadas (`padron_rechazos.bad`), y las pruebas crean y borran un archivo pequeño. Por eso la carpeta debe pertenecer al usuario `oracle`.
 
 ```powershell
-docker exec -u 0 eif402-oracle21c-oficial chown -R oracle /tmp/padron
-docker exec eif402-oracle21c-oficial ls -lh /tmp/padron/
+docker exec --user root $contenedor chown -R oracle:oinstall /tmp/padron
+docker exec --user root $contenedor chmod 750 /tmp/padron
+docker exec --user root $contenedor chmod 640 /tmp/padron/PADRON_COMPLETO.txt
+docker exec $contenedor ls -lh /tmp/padron/
 ```
 
 Debe aparecer `PADRON_COMPLETO.txt` con su tamaño y con `oracle` como dueño.
 
 ## 7. Configurar Oracle (como SYS)
 
-Conectado como `SYS` (o `SYSTEM`) a la PDB (`XEPDB1` o `ORCLPDB1`):
+Conectado como `SYS` (o `SYSTEM`) a la PDB `ORCLPDB1` del contenedor `dg-primaria`:
 
 ```sql
 CREATE OR REPLACE DIRECTORY DIR_PADRON AS '/tmp/padron';
@@ -214,7 +239,7 @@ Carga del padron: PADRON_COMPLETO.txt (WE8MSWIN1252)
   Personas enlazadas : ...
 ```
 
-La carga completa tarda unos minutos, según el equipo. Una segunda carga del mismo archivo debe dar `Insertadas: 0` y `Actualizadas: 0`.
+La carga completa tarda unos minutos, según el equipo. En la carga realizada el 16 de noviembre de 2026 se leyeron e insertaron 3,764,647 filas válidas, sin inválidas ni repetidas, y se enlazaron 15 personas. Una segunda carga del mismo archivo debe dar `Insertadas: 0` y `Actualizadas: 0`.
 
 **Automatización.** Oracle no puede descargar ni descomprimir el ZIP del TSE por sí solo; ese paso lo hace una persona cuando el TSE publica un padrón nuevo. Lo demás sí es automático: el job `JOB_CP_CARGA_PADRON` carga el archivo de la carpeta el día 1 de cada mes y enlaza a las personas. Para ejecutarlo en el momento (por ejemplo, en la defensa):
 
@@ -312,7 +337,7 @@ ORDER  BY name, sequence;
 
 - **La carga se replica sola.** Las filas cargadas viajan a la standby por el redo, como cualquier otro cambio. Para eso la primaria debe estar en `FORCE LOGGING` (guía de FSFO, paso 3): si una carga masiva no generara redo, la standby quedaría incompleta.
 - **El archivo no se replica.** `/tmp/padron` está en el sistema de archivos del contenedor, no en la base. Si hay un failover y hay que volver a cargar desde la nueva primaria, el archivo tiene que copiarse a ese contenedor (sección 6). El objeto `DIR_PADRON` sí llega con la base, porque está en el diccionario.
-- **En `dg-primaria`** se siguen los mismos pasos, cambiando el contenedor por `dg-primaria` y la PDB por `ORCLPDB1`.
+- **Instalación activa:** el archivo está copiado en `dg-primaria` (`/tmp/padron/PADRON_COMPLETO.txt`) y el directorio de Oracle `DIR_PADRON` apunta a `/tmp/padron` en `ORCLPDB1`. El archivo no se replica a `dg-standby`; si se promueve ese contenedor y se requiere volver a cargar el padrón, hay que copiar el TXT allí y comprobar que el objeto `DIR_PADRON` mantenga la ruta correcta.
 
 ## 16. Archivos del módulo
 

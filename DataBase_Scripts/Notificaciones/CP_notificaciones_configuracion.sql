@@ -14,7 +14,7 @@
 --              sustitucion), asi ningun correo ni clave queda escrito
 --              en el repositorio.
 --
--- EJECUTAR COMO: CP_POS en XEPDB1, con F5 (como script) en SQL
+-- EJECUTAR COMO: CP_POS en ORCLPDB1, como script en SQL
 --                Developer. Despues del script 15
 --                (PKG_CP_CRIPTO y PKG_CP_PARAMETRO) y antes de
 --                instalar PKG_CP_NOTIFICACIONES. Se puede volver a
@@ -34,8 +34,10 @@
 -- ============================================================
 
 SET SERVEROUTPUT ON SIZE UNLIMITED
--- Evita que SQL Developer imprima las lineas con los valores ya
--- sustituidos (la clave apareceria en la salida).
+-- Desactiva el eco y la comparacion de lineas sustituidas.
+-- Ante errores del cliente, revisar la salida antes de compartirla:
+-- algunos clientes muestran el bloque completo con valores sustituidos.
+SET ECHO OFF
 SET VERIFY OFF
 
 PROMPT Correo que recibe los avisos (CORREO_ALERTAS_BD):
@@ -68,6 +70,8 @@ DECLARE
     v_type     NUMBER;
     v_config   NUMBER;
     v_count    NUMBER;
+    v_sender_contact NUMBER;
+    v_alert_contact  NUMBER;
 
     -- Devuelve el contacto de tipo CORREO con ese valor; si no existe lo crea.
     FUNCTION mail_contact(
@@ -152,17 +156,21 @@ BEGIN
     FROM CP_CONFIGURACION_CORREO
     WHERE LOWER(usuario_smtp) = v_sender;
 
+    -- Las funciones locales PL/SQL se llaman fuera de las sentencias SQL.
+    v_sender_contact := mail_contact(v_sender);
+
     IF v_config IS NULL THEN
         INSERT INTO CP_CONFIGURACION_CORREO
             (id_contacto_remitente, servidor_smtp, puerto_smtp, usuario_smtp,
              clave_cifrada, requiere_tls, activo)
         VALUES
-            (mail_contact(v_sender), c_smtp_host, c_smtp_port, v_sender,
+            (v_sender_contact, c_smtp_host, c_smtp_port, v_sender,
              PKG_CP_CRIPTO.cifrar(v_secret), 'S', 'S')
         RETURNING id_configuracion_correo INTO v_config;
     ELSE
         UPDATE CP_CONFIGURACION_CORREO
-        SET servidor_smtp = c_smtp_host,
+        SET id_contacto_remitente = v_sender_contact,
+            servidor_smtp = c_smtp_host,
             puerto_smtp   = c_smtp_port,
             clave_cifrada = PKG_CP_CRIPTO.cifrar(v_secret),
             requiere_tls  = 'S',
@@ -178,8 +186,10 @@ BEGIN
 
     -- 1.3 Destinatario activo para el correo de avisos (encolar solo
     --     acepta destinatarios registrados y activos)
+    v_alert_contact := mail_contact(v_alerts);
+
     MERGE INTO CP_DESTINATARIO_NOTIFICACION d
-    USING (SELECT mail_contact(v_alerts) AS id_contacto FROM dual) s
+    USING (SELECT v_alert_contact AS id_contacto FROM dual) s
        ON (d.id_contacto = s.id_contacto)
     WHEN MATCHED THEN
         UPDATE SET d.activo = 'S'

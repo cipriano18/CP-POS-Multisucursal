@@ -26,7 +26,7 @@
 --   SESIONES_UMBRAL_PCT         (85)  sesiones o procesos usados (nuevo)
 --   SESION_BLOQUEO_SEGUNDOS     (60)  espera de una sesion bloqueada (nuevo)
 --
--- EJECUTAR COMO: CP_POS en XEPDB1, despues del 26A (con queue_notice_to)
+-- EJECUTAR COMO: CP_POS en ORCLPDB1, despues del 26A (con queue_notice_to)
 --                y del modulo de notificaciones (pasos 1 a 4). Antes, como
 --                SYS, los GRANT de V_$PARAMETER y V_$PROCESS de la
 --                seccion 10 de CP_usuario_esquema.sql.
@@ -2711,7 +2711,7 @@ END;
 -- ============================================================
 -- 10. JOBS
 -- ============================================================
--- Avisos de negocio: diario a las 07:00. Monitoreo diario: 06:30.
+-- Horarios de Costa Rica: avisos diarios a las 07:00; monitoreo a las 06:30.
 -- Sesiones: cada 15 minutos (avisa a lo sumo una vez por hora).
 -- JOB_CP_PROCESAR_NOTIFICACIONES (jobs/diarios/) envia la cola cada 15
 -- minutos y no se toca aqui. Se vuelven a crear en cada ejecucion.
@@ -2745,7 +2745,7 @@ BEGIN
         job_name        => 'JOB_CP_ALERTAS_NEGOCIO',
         job_type        => 'PLSQL_BLOCK',
         job_action      => 'BEGIN PKG_CP_ALERTA.run_daily; END;',
-        start_date      => SYSTIMESTAMP,
+        start_date      => SYSTIMESTAMP AT TIME ZONE 'America/Costa_Rica',
         repeat_interval => 'FREQ=DAILY;BYHOUR=7;BYMINUTE=0;BYSECOND=0',
         enabled         => TRUE,
         comments        => 'Avisos de credito, cuentas por pagar, mora y productos vencidos.'
@@ -2755,7 +2755,7 @@ BEGIN
         job_name        => 'JOB_CP_MONITOREO_DIARIO',
         job_type        => 'PLSQL_BLOCK',
         job_action      => 'BEGIN PKG_CP_MONITOREO.run_daily; END;',
-        start_date      => SYSTIMESTAMP,
+        start_date      => SYSTIMESTAMP AT TIME ZONE 'America/Costa_Rica',
         repeat_interval => 'FREQ=DAILY;BYHOUR=6;BYMINUTE=30;BYSECOND=0',
         enabled         => TRUE,
         comments        => 'Crecimiento, tablespaces, objetos invalidos, indices y errores.'
@@ -2765,7 +2765,7 @@ BEGIN
         job_name        => 'JOB_CP_MONITOREO_SESIONES',
         job_type        => 'PLSQL_BLOCK',
         job_action      => 'BEGIN PKG_CP_MONITOREO.check_sessions; END;',
-        start_date      => SYSTIMESTAMP,
+        start_date      => SYSTIMESTAMP AT TIME ZONE 'America/Costa_Rica',
         repeat_interval => 'FREQ=MINUTELY;INTERVAL=15',
         enabled         => TRUE,
         comments        => 'Uso de sesiones y procesos, y sesiones bloqueadas.'
