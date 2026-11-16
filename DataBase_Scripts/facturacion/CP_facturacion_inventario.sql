@@ -1659,7 +1659,7 @@ BEGIN
     SELECT a.id_almacen, a.id_sucursal
     INTO v_id_almacen, v_id_sucursal
     FROM CP_ALMACEN a
-    WHERE a.nombre_almacen = 'Almacen Alajuela';
+    WHERE a.nombre_almacen = 'Almacen Paso Canoas';
 
     SELECT p.id_producto, pp.id_producto_proveedor, pp.id_proveedor
     INTO v_id_producto, v_id_pp, v_id_proveedor
