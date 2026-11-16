@@ -273,6 +273,7 @@ DECLARE
     v_est2    NUMBER;
     v_l1      NUMBER;
     v_tr      NUMBER;
+    v_lote_id NUMBER;
     v_prom    NUMBER;
     v_regla   NUMBER;
     v_desc    NUMBER;
@@ -460,8 +461,8 @@ DECLARE
         END LOOP;
         IF p_estado = 'PENDIENTE' THEN
             SELECT id_estado_cuenta_pagar INTO v_ec FROM CP_ESTADO_CUENTA_PAGAR WHERE nombre_estado_cuenta_pagar = 'PENDIENTE';
-            INSERT INTO CP_CUENTA_PAGAR (id_factura_compra, id_estado_cuenta_pagar, fecha_vencimiento, observacion)
-            VALUES (v_fc, v_ec, p_fecha + 30, 'Cuenta por pagar factura ' || p_num) RETURNING id_cuenta_pagar INTO v_cta;
+            INSERT INTO CP_CUENTA_PAGAR (id_factura_compra, id_estado_cuenta_pagar, fecha_creacion, fecha_vencimiento, observacion)
+            VALUES (v_fc, v_ec, p_fecha, p_fecha + 30, 'Cuenta por pagar factura ' || p_num) RETURNING id_cuenta_pagar INTO v_cta;
             IF p_abono > 0 THEN
                 SELECT id_tipo_pago INTO v_tp FROM CP_TIPO_PAGO WHERE nombre_tipo_pago = 'TRANSFERENCIA';
                 INSERT INTO CP_ABONO_CUENTA_PAGAR (id_cuenta_pagar, id_tipo_pago, id_usuario, monto_abono, fecha_abono, numero_referencia, observacion)
@@ -821,8 +822,8 @@ BEGIN
 
     SELECT id_estado_cuenta_cobrar INTO v_est2 FROM CP_ESTADO_CUENTA_COBRAR WHERE nombre_estado_cuenta_cobrar = 'PENDIENTE';
     FOR n IN 1 .. cr_n LOOP
-        INSERT INTO CP_CUENTA_COBRAR (id_factura_venta, id_credito_cliente, id_estado_cuenta_cobrar, fecha_vencimiento, observacion)
-        VALUES (cr_fact(n), v_cred(cr_key(n)), v_est2, cr_fecha(n) + 30, 'Cuenta por cobrar de la venta a credito ' || n)
+        INSERT INTO CP_CUENTA_COBRAR (id_factura_venta, id_credito_cliente, id_estado_cuenta_cobrar, fecha_creacion, fecha_vencimiento, observacion)
+        VALUES (cr_fact(n), v_cred(cr_key(n)), v_est2, cr_fecha(n), cr_fecha(n) + 30, 'Cuenta por cobrar de la venta a credito ' || n)
         RETURNING id_cuenta_cobrar INTO v_id;
         IF cr_abono(n) > 0 THEN
             SELECT id_tipo_pago INTO v_l1 FROM CP_TIPO_PAGO WHERE nombre_tipo_pago = 'SINPE';
@@ -866,11 +867,13 @@ BEGIN
     INSERT INTO CP_TRASLADO (id_almacen_origen, id_almacen_destino, id_usuario_solicita, id_estado_traslado, fecha_solicitud, observacion)
     VALUES (v_alm('SUC001'), v_alm('SUC002'), v_cajero('SUC002'), v_est, TIMESTAMP '2026-11-10 08:00:00', 'Reposicion de frijoles para Paso Canoas')
     RETURNING id_traslado INTO v_tr;
-    INSERT INTO CP_DETALLE_TRASLADO (id_traslado, id_lote_producto, cantidad) VALUES (v_tr, lote_de('COMP-0002','PROD002'), 20);
+    v_lote_id := lote_de('COMP-0002','PROD002');
+    INSERT INTO CP_DETALLE_TRASLADO (id_traslado, id_lote_producto, cantidad) VALUES (v_tr, v_lote_id, 20);
     INSERT INTO CP_TRASLADO (id_almacen_origen, id_almacen_destino, id_usuario_solicita, id_estado_traslado, fecha_solicitud, observacion)
     VALUES (v_alm('SUC001'), v_alm('SUC003'), v_cajero('SUC003'), v_est, TIMESTAMP '2026-11-12 08:30:00', 'Reposicion de leche para San Vito')
     RETURNING id_traslado INTO v_tr;
-    INSERT INTO CP_DETALLE_TRASLADO (id_traslado, id_lote_producto, cantidad) VALUES (v_tr, lote_de('COMP-0003','PROD008'), 30);
+    v_lote_id := lote_de('COMP-0003','PROD008');
+    INSERT INTO CP_DETALLE_TRASLADO (id_traslado, id_lote_producto, cantidad) VALUES (v_tr, v_lote_id, 30);
 
     ----------------------------------------------------------
     -- Devoluciones y notas de credito
@@ -981,10 +984,12 @@ BEGIN
     UPDATE CP_PRODUCTO_NEGOCIO SET precio_venta_actual = precio_venta_actual + 35
     WHERE id_negocio = v_negocio AND id_producto = (SELECT id_producto FROM CP_PRODUCTO WHERE codigo_producto = 'PROD017');
 
+    v_lote_id := lote_de('COMP-0004','PROD013');
     UPDATE CP_INVENTARIO_ALMACEN SET cantidad_actual = cantidad_actual - 1
-    WHERE id_lote_producto = lote_de('COMP-0004','PROD013') AND cantidad_actual > 1;
+    WHERE id_lote_producto = v_lote_id AND cantidad_actual > 1;
+    v_lote_id := lote_de('COMP-0005','PROD019');
     UPDATE CP_INVENTARIO_ALMACEN SET cantidad_actual = cantidad_actual + 2
-    WHERE id_lote_producto = lote_de('COMP-0005','PROD019');
+    WHERE id_lote_producto = v_lote_id;
 
     UPDATE CP_CREDITO_CLIENTE SET limite_credito = limite_credito + 10000 WHERE id_credito_cliente = v_cred('3-101-702356');
     UPDATE CP_CREDITO_CLIENTE SET limite_credito = limite_credito + 10000 WHERE id_credito_cliente = v_cred('3-101-659843');
@@ -1172,43 +1177,49 @@ BEGIN
 
     -- Premiacion de muestra: tres clientes existentes, sin datos de padron.
     INSERT INTO CP_EJECUCION_PREMIACION (
-        id_ejecucion_premiacion, fecha_inicio_periodo, fecha_fin_periodo,
-        monto_premio, cantidad_premiados
-    ) VALUES (1, DATE '2026-01-01', DATE '2026-11-15', 50000, 3);
+        id_ejecucion_premiacion, fecha_ejecucion, fecha_inicio_periodo,
+        fecha_fin_periodo, monto_premio, cantidad_premiados
+    ) VALUES (
+        1, TIMESTAMP '2026-05-01 01:15:00', DATE '2025-11-01',
+        DATE '2026-04-30', 100000, 3
+    );
 
     INSERT INTO CP_ORDEN_PREMIO_CLIENTE (
-        id_orden_premio_cliente, id_ejecucion_premiacion, id_cliente, posicion, monto_premio
+        id_orden_premio_cliente, id_ejecucion_premiacion, id_cliente, posicion,
+        monto_premio, fecha_emision
     )
-    SELECT 1, 1, c.id_cliente, 1, 25000
+    SELECT 1, 1, c.id_cliente, 1, 100000, TIMESTAMP '2026-05-01 01:15:00'
     FROM CP_CLIENTE c JOIN CP_CLIENTE_PERSONA cp ON cp.id_cliente = c.id_cliente
     JOIN CP_PERSONA p ON p.id_persona = cp.id_persona
     WHERE p.identificacion = '601560234';
 
     INSERT INTO CP_ORDEN_PREMIO_CLIENTE (
-        id_orden_premio_cliente, id_ejecucion_premiacion, id_cliente, posicion, monto_premio
+        id_orden_premio_cliente, id_ejecucion_premiacion, id_cliente, posicion,
+        monto_premio, fecha_emision
     )
-    SELECT 2, 1, c.id_cliente, 2, 15000
+    SELECT 2, 1, c.id_cliente, 2, 100000, TIMESTAMP '2026-05-01 01:15:00'
     FROM CP_CLIENTE c JOIN CP_CLIENTE_PERSONA cp ON cp.id_cliente = c.id_cliente
     JOIN CP_PERSONA p ON p.id_persona = cp.id_persona
     WHERE p.identificacion = '602340871';
 
     INSERT INTO CP_ORDEN_PREMIO_CLIENTE (
-        id_orden_premio_cliente, id_ejecucion_premiacion, id_cliente, posicion, monto_premio
+        id_orden_premio_cliente, id_ejecucion_premiacion, id_cliente, posicion,
+        monto_premio, fecha_emision
     )
-    SELECT 3, 1, c.id_cliente, 3, 10000
+    SELECT 3, 1, c.id_cliente, 3, 100000, TIMESTAMP '2026-05-01 01:15:00'
     FROM CP_CLIENTE c JOIN CP_CLIENTE_PERSONA cp ON cp.id_cliente = c.id_cliente
     JOIN CP_PERSONA p ON p.id_persona = cp.id_persona
     WHERE p.identificacion = '603120945';
 
     -- Bitacoras adicionales para los modulos nuevos de la defensa.
-    SELECT id_cliente INTO v_cliente
+    SELECT c.id_cliente INTO v_cliente
     FROM CP_CLIENTE_PERSONA cp JOIN CP_PERSONA p ON p.id_persona = cp.id_persona
     JOIN CP_CLIENTE c ON c.id_cliente = cp.id_cliente
     WHERE p.identificacion = '601560234';
 
     INSERT INTO CP_BITACORA_CLIENTE (
-        id_bitacora_cliente, id_cliente, id_usuario, operacion, valor_anterior, valor_nuevo
-    ) VALUES (1, v_cliente, v_usuario, 'CREACION', NULL, 'Alta inicial del cliente de muestra');
+        id_cliente, id_usuario, operacion, valor_anterior, valor_nuevo
+    ) VALUES (v_cliente, v_usuario, 'CREACION', NULL, 'Alta inicial del cliente de muestra');
 
     SELECT pp.id_producto_proveedor, pp.precio_costo_actual INTO v_pp, v_costo
     FROM CP_PRODUCTO_PROVEEDOR pp JOIN CP_PRODUCTO p ON p.id_producto = pp.id_producto
@@ -1219,32 +1230,32 @@ BEGIN
     WHERE id_producto_proveedor = v_pp;
 
     INSERT INTO CP_BITACORA_COSTO_PRODUCTO (
-        id_bitacora_costo_producto, id_producto_proveedor, id_usuario, costo_anterior, costo_nuevo
-    ) VALUES (1, v_pp, v_usuario, v_costo, v_costo + 25);
+        id_producto_proveedor, id_usuario, costo_anterior, costo_nuevo
+    ) VALUES (v_pp, v_usuario, v_costo, v_costo + 25);
 
     INSERT INTO CP_BITACORA_DESCUENTO (
-        id_bitacora_descuento, id_descuento, id_usuario, operacion, valor_anterior, valor_nuevo
-    ) VALUES (1, v_descuento, v_usuario, 'CREACION', NULL,
+        id_descuento, id_usuario, operacion, valor_anterior, valor_nuevo
+    ) VALUES (v_descuento, v_usuario, 'CREACION', NULL,
               'Descuento de temporada para verduras: 10 por ciento');
 
     INSERT INTO CP_BITACORA_ERROR (
-        id_bitacora_error, modulo, codigo_error, mensaje_error, detalle_error
-    ) VALUES (1, 'CARGA_DEFENSA', -20001,
+        modulo, codigo_error, mensaje_error, detalle_error
+    ) VALUES ('CARGA_DEFENSA', -20001,
               'Evento sintetico de demostracion de bitacora',
               'No representa un error real ni una falla de carga.');
 
     INSERT INTO CP_BITACORA_PROMOCION (
-        id_bitacora_promocion, id_promocion, id_usuario, operacion, valor_anterior, valor_nuevo
+        id_promocion, id_usuario, operacion, valor_anterior, valor_nuevo
     )
-    SELECT 1, id_promocion, v_usuario, 'CREACION', NULL,
+    SELECT id_promocion, v_usuario, 'CREACION', NULL,
            'Promocion activa cargada para la defensa'
     FROM CP_PROMOCION
     WHERE nombre_promocion = 'Lleve 2 Arroz y reciba 1 Frijoles';
 
     INSERT INTO CP_BITACORA_PROVEEDOR (
-        id_bitacora_proveedor, id_proveedor, id_usuario, operacion, valor_anterior, valor_nuevo
+        id_proveedor, id_usuario, operacion, valor_anterior, valor_nuevo
     )
-    SELECT 1, id_proveedor, v_usuario, 'CREACION', NULL,
+    SELECT id_proveedor, v_usuario, 'CREACION', NULL,
            'Proveedor de abarrotes cargado para la defensa'
     FROM CP_PROVEEDOR
     WHERE cedula_juridica = '3-101-598231';
@@ -1301,3 +1312,54 @@ END;
 /
 
 COMMIT;
+
+
+-- ============================================================
+-- 5. AJUSTE DE SECUENCIAS
+-- ============================================================
+
+DECLARE
+    v_default   VARCHAR2(4000);
+    v_sequence  VARCHAR2(128);
+    v_max_id    NUMBER;
+    v_next      NUMBER;
+    v_adjusted  PLS_INTEGER := 0;
+BEGIN
+    FOR r IN (
+        SELECT c.table_name, c.column_name, c.data_default
+        FROM user_tab_columns c
+        JOIN user_cons_columns cc
+          ON cc.table_name = c.table_name
+         AND cc.column_name = c.column_name
+        JOIN user_constraints k
+          ON k.constraint_name = cc.constraint_name
+         AND k.constraint_type = 'P'
+        WHERE c.table_name LIKE 'CP\_%' ESCAPE '\'
+    ) LOOP
+        v_default  := UPPER(r.data_default);
+        v_sequence := REGEXP_SUBSTR(v_default, '"?([A-Z0-9_$#]+)"?\."?NEXTVAL', 1, 1, NULL, 1);
+
+        IF v_sequence IS NOT NULL THEN
+            EXECUTE IMMEDIATE
+                'SELECT NVL(MAX(' || r.column_name || '), 0) FROM ' || r.table_name
+                INTO v_max_id;
+
+            SELECT last_number INTO v_next
+            FROM user_sequences
+            WHERE sequence_name = v_sequence;
+
+            IF v_next <= v_max_id THEN
+                EXECUTE IMMEDIATE
+                    'ALTER SEQUENCE ' || v_sequence || ' RESTART START WITH ' || TO_CHAR(v_max_id + 1);
+                v_adjusted := v_adjusted + 1;
+                DBMS_OUTPUT.PUT_LINE(RPAD(v_sequence, 42) || TO_CHAR(v_next) || ' -> ' || TO_CHAR(v_max_id + 1));
+            END IF;
+        END IF;
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('Secuencias ajustadas: ' || v_adjusted);
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20044, 'No se pudieron ajustar las secuencias: ' || SQLERRM);
+END;
+/

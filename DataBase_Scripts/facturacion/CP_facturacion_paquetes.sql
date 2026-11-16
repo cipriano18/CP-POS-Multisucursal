@@ -1502,6 +1502,7 @@ DECLARE
     v_id_negocio   NUMBER;
     v_id_almacen   NUMBER;
     v_id_sin_cred  NUMBER;
+    v_id_estado    NUMBER;
     v_id_usuario   NUMBER;
     v_id_tipo_pago NUMBER;
     v_id_credito   NUMBER;
@@ -1709,6 +1710,16 @@ BEGIN
           AND cr.id_negocio = v_id_negocio
     );
 
+    IF v_id_sin_cred IS NULL THEN
+        SELECT id_estado INTO v_id_estado
+        FROM CP_ESTADO
+        WHERE nombre = 'ACTIVO';
+
+        INSERT INTO CP_PROVEEDOR (id_estado, cedula_juridica, razon_social, nombre_comercial)
+        VALUES (v_id_estado, 'TEST-PROV-SIN-CREDITO', 'Proveedor de prueba sin credito', 'Prueba')
+        RETURNING id_proveedor INTO v_id_sin_cred;
+    END IF;
+
     SELECT MIN(id_usuario) INTO v_id_usuario FROM CP_USUARIO;
     SELECT MIN(id_tipo_pago) INTO v_id_tipo_pago FROM CP_TIPO_PAGO;
 
@@ -1762,12 +1773,8 @@ BEGIN
     reportar('6. Factura de 100000 (justo el cupo) se acepta',
              v_codigo = 0 AND v_c3 IS NOT NULL);
 
-    IF v_id_sin_cred IS NULL THEN
-        reportar('7. Proveedor sin credito da -20260 (no hay proveedor para probar)', TRUE);
-    ELSE
-        reportar('7. Proveedor sin credito da -20260',
-                 provoca(nueva_factura('TEST-FC-4', v_id_sin_cred, 1), -20260));
-    END IF;
+    reportar('7. Proveedor sin credito da -20260',
+             provoca(nueva_factura('TEST-FC-4', v_id_sin_cred, 1), -20260));
 
     -- Anulacion de la factura
     UPDATE CP_FACTURA_COMPRA

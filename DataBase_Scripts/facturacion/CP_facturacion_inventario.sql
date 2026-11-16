@@ -1656,19 +1656,56 @@ BEGIN
 
     SELECT NVL(MAX(id_bitacora_error), 0) INTO v_antes FROM CP_BITACORA_ERROR;
 
-    SELECT a.id_almacen, a.id_sucursal
-    INTO v_id_almacen, v_id_sucursal
-    FROM CP_ALMACEN a
-    WHERE a.nombre_almacen = 'Almacen Paso Canoas';
+    BEGIN
+        SELECT a.id_almacen, a.id_sucursal, p.id_producto, pp.id_producto_proveedor, pp.id_proveedor
+        INTO v_id_almacen, v_id_sucursal, v_id_producto, v_id_pp, v_id_proveedor
+        FROM CP_ALMACEN a
+        JOIN CP_ESTADO ea
+          ON ea.id_estado = a.id_estado
+         AND ea.nombre = 'ACTIVO'
+        JOIN CP_SUCURSAL s
+          ON s.id_sucursal = a.id_sucursal
+        JOIN CP_PRODUCTO_NEGOCIO pn
+          ON pn.id_negocio = s.id_negocio
+        JOIN CP_PRODUCTO p
+          ON p.id_producto = pn.id_producto
+        JOIN CP_ESTADO ep
+          ON ep.id_estado = p.id_estado
+         AND ep.nombre = 'ACTIVO'
+        JOIN CP_PRODUCTO_PROVEEDOR pp
+          ON pp.id_producto = p.id_producto
+        WHERE (
+                SELECT COUNT(*)
+                FROM CP_ALMACEN a2
+                JOIN CP_ESTADO e2
+                  ON e2.id_estado = a2.id_estado
+                WHERE a2.id_sucursal = a.id_sucursal
+                  AND e2.nombre = 'ACTIVO'
+              ) = 1
+          AND NOT EXISTS (
+                SELECT 1
+                FROM CP_INVENTARIO_ALMACEN ia
+                JOIN CP_LOTE_PRODUCTO lp
+                  ON lp.id_lote_producto = ia.id_lote_producto
+                JOIN CP_DETALLE_COMPRA dc
+                  ON dc.id_detalle_compra = lp.id_detalle_compra
+                JOIN CP_PRODUCTO_PROVEEDOR pp2
+                  ON pp2.id_producto_proveedor = dc.id_producto_proveedor
+                WHERE ia.id_almacen = a.id_almacen
+                  AND pp2.id_producto = p.id_producto
+                  AND ia.cantidad_actual > 0
+              )
+        ORDER BY a.id_almacen, p.codigo_producto, pp.id_producto_proveedor
+        FETCH FIRST 1 ROW ONLY;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            DBMS_OUTPUT.PUT_LINE(
+                'Pruebas omitidas: no hay un almacen que sea el unico activo de su sucursal con un producto sin existencias.'
+            );
+            RETURN;
+    END;
 
-    SELECT p.id_producto, pp.id_producto_proveedor, pp.id_proveedor
-    INTO v_id_producto, v_id_pp, v_id_proveedor
-    FROM CP_PRODUCTO p
-    JOIN CP_PRODUCTO_PROVEEDOR pp
-      ON pp.id_producto = p.id_producto
-    WHERE p.codigo_producto = 'PROD001'
-    ORDER BY pp.id_producto_proveedor
-    FETCH FIRST 1 ROW ONLY;
+    DBMS_OUTPUT.PUT_LINE('Almacen de prueba: ' || v_id_almacen || ', producto: ' || v_id_producto);
 
     SELECT COUNT(*)
     INTO v_activos
@@ -1692,7 +1729,7 @@ BEGIN
 
     IF v_activos <> 1 OR v_stock_previo <> 0 THEN
         DBMS_OUTPUT.PUT_LINE(
-            'Pruebas omitidas: Almacen Alajuela debe ser el unico almacen activo de su sucursal y no tener stock de PROD001.'
+            'Pruebas omitidas: el almacen de prueba debe ser el unico activo de su sucursal y no tener existencias del producto.'
         );
         RETURN;
     END IF;
